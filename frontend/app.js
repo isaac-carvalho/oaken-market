@@ -1,7 +1,9 @@
 // app.js — funções partilhadas entre index.html, curso.html e login.html.
 // HTML/CSS/JS puro, sem framework, sem build step.
 
-const API_BASE = 'http://localhost:5000';
+const API_BASE = ['localhost', '127.0.0.1'].includes(window.location.hostname)
+  ? 'http://localhost:5000'
+  : 'https://oaken-market-backend.onrender.com';
 
 /**
  * Faz fetch à API, juntando automaticamente o header Authorization com o
