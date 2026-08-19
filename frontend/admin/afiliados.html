@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pt-AO">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Afiliados — Painel Oaken Market</title>
+<script>
+  (function () {
+    if (localStorage.getItem('theme') === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  })();
+</script>
+<link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<div id="admin-blocked" class="admin-blocked hidden">
+  <div class="admin-blocked-box">
+    <div class="icon">🔒</div>
+    <h1>Acesso restrito</h1>
+    <p>Este painel é só para a conta administradora da Oaken Market. A tua conta não tem permissão para entrar aqui.</p>
+    <a class="btn btn-primary" href="../index.html">Voltar à loja</a>
+  </div>
+</div>
+
+<div id="admin-app" class="admin-layout hidden">
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar-brand">
+      <a class="logo" href="index.html">OAKEN <span>MARKET</span></a>
+      <span class="admin-tag">Painel do produtor</span>
+    </div>
+    <nav id="admin-nav"></nav>
+    <div class="admin-sidebar-footer">
+      <div id="admin-user"></div>
+      <button type="button" id="admin-logout-btn" class="btn btn-outline btn-sm btn-block">Sair</button>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div>
+        <h1 class="admin-title">Afiliados</h1>
+        <p class="admin-sub">Pedidos de afiliação dos cursos da Oaken Market.</p>
+      </div>
+    </div>
+
+    <div id="error-box" class="alert alert-error hidden"></div>
+
+    <div class="admin-panel">
+      <div class="admin-panel-header">
+        <h2>Pedidos</h2>
+        <div class="admin-tabs" id="status-tabs">
+          <button type="button" class="admin-tab admin-tab-active" data-status="PENDING">Pendentes</button>
+          <button type="button" class="admin-tab" data-status="APPROVED">Aprovados</button>
+          <button type="button" class="admin-tab" data-status="REJECTED">Reprovados</button>
+        </div>
+      </div>
+
+      <div id="loading" class="loading-state">A carregar afiliados…</div>
+      <div class="admin-table-wrap">
+        <table class="admin-table hidden" id="affiliates-table">
+          <thead>
+            <tr>
+              <th>Candidato</th>
+              <th>Curso</th>
+              <th>Data do pedido</th>
+              <th>Comissão</th>
+              <th id="actions-th">Acções</th>
+            </tr>
+          </thead>
+          <tbody id="affiliates-tbody"></tbody>
+        </table>
+      </div>
+      <div id="empty-state" class="empty-state hidden"></div>
+    </div>
+  </main>
+</div>
+
+<script src="../app.js"></script>
+<script src="admin.js"></script>
+<script>
+  const user = initAdminPage('afiliados');
+
+  if (user) {
+    const loading = document.getElementById('loading');
+    const errorBox = document.getElementById('error-box');
+    const table = document.getElementById('affiliates-table');
+    const tbody = document.getElementById('affiliates-tbody');
+    const emptyState = document.getElementById('empty-state');
+    const tabsEl = document.getElementById('status-tabs');
+
+    let activeStatus = 'PENDING';
+
+    const EMPTY_LABEL = {
+      PENDING: 'Nenhuma solicitação pendente.',
+      APPROVED: 'Nenhum afiliado aprovado.',
+      REJECTED: 'Nenhuma solicitação reprovada.',
+    };
+
+    function formatDate(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      return d.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+
+    function affiliateRow(affiliate) {
+      const tr = document.createElement('tr');
+
+      const actionsCell = activeStatus === 'PENDING'
+        ? `
+          <div class="admin-table-actions">
+            <button type="button" class="btn btn-primary btn-sm" data-action="APPROVED" data-id="${affiliate.id}">Aprovar</button>
+            <button type="button" class="btn btn-outline btn-sm" data-action="REJECTED" data-id="${affiliate.id}">Reprovar</button>
+          </div>
+        `
+        : '—';
+
+      tr.innerHTML = `
+        <td>
+          ${affiliate.user ? affiliate.user.name : '—'}
+          <div class="muted">${affiliate.user ? affiliate.user.email : ''}</div>
+        </td>
+        <td>${affiliate.course ? affiliate.course.title : '—'}</td>
+        <td>${formatDate(affiliate.createdAt)}</td>
+        <td>${affiliate.commissionPct}%</td>
+        <td>${actionsCell}</td>
+      `;
+      return tr;
+    }
+
+    async function decide(id, status) {
+      clearError(errorBox);
+      try {
+        await apiFetch(`/api/admin/affiliates/${encodeURIComponent(id)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status }),
+        });
+        await loadAffiliates();
+      } catch (err) {
+        showError(errorBox, err);
+      }
+    }
+
+    async function loadAffiliates() {
+      clearError(errorBox);
+      loading.classList.remove('hidden');
+      table.classList.add('hidden');
+      emptyState.classList.add('hidden');
+      tbody.innerHTML = '';
+
+      try {
+        const data = await apiFetch(`/api/admin/affiliates?status=${encodeURIComponent(activeStatus)}`);
+        loading.classList.add('hidden');
+
+        const affiliates = data.affiliates || [];
+        if (affiliates.length === 0) {
+          emptyState.textContent = EMPTY_LABEL[activeStatus] || 'Nenhum registo encontrado.';
+          emptyState.classList.remove('hidden');
+          return;
+        }
+
+        table.classList.remove('hidden');
+        affiliates.forEach((affiliate) => tbody.appendChild(affiliateRow(affiliate)));
+      } catch (err) {
+        loading.classList.add('hidden');
+        showError(errorBox, err);
+      }
+    }
+
+    tabsEl.addEventListener('click', (ev) => {
+      const btn = ev.target.closest('.admin-tab');
+      if (!btn) return;
+      activeStatus = btn.dataset.status;
+      Array.from(tabsEl.querySelectorAll('.admin-tab')).forEach((el) => {
+        el.classList.toggle('admin-tab-active', el === btn);
+      });
+      loadAffiliates();
+    });
+
+    tbody.addEventListener('click', (ev) => {
+      const btn = ev.target.closest('button[data-action]');
+      if (!btn) return;
+      decide(btn.dataset.id, btn.dataset.action);
+    });
+
+    loadAffiliates();
+  }
+</script>
+</body>
+</html>

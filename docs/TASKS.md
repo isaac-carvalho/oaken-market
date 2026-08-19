@@ -467,6 +467,54 @@ existir dinheiro real).
   (Zod enum) — qualquer outra coisa dá 400.
 - `node --check` limpo em todos os ficheiros tocados.
 
+## Tarefa 12 — Frontend de Afiliados (loja + painel) ✅ concluída, revista pelo sénior
+
+Backend pronto (Tarefa 11): `POST /api/affiliates`, `GET
+/api/affiliates/me`, `GET/PATCH /api/admin/affiliates`. `POST
+/api/orders` já aceita `affiliateRef` opcional no body.
+
+**Lado da loja (`frontend/curso.html`)**:
+- Se o utilizador tem sessão e ainda não tem afiliação para este curso
+  (`GET /api/affiliates/me`, procurar pelo `course.slug` da página
+  actual), mostrar um botão "Tornar-me afiliado" na sidebar/buy-box.
+  Ao clicar, `POST /api/affiliates {courseId}`, depois mostrar o estado
+  actualizado (ver abaixo).
+- Se já tem afiliação `PENDING` para este curso: mostrar "Pedido de
+  afiliação em análise" (sem botão).
+- Se já tem afiliação `APPROVED`: mostrar o link de indicação — a URL
+  actual da página + `?ref=<affiliate.id>` — com um botão para copiar
+  (`navigator.clipboard.writeText`).
+- Se `REJECTED`: mostrar "Pedido de afiliação não aprovado" (sem botão
+  de novo pedido — mantém simples, sem reenvio automático).
+- Ao comprar (`buyCourse()` já existente): se a URL actual tiver
+  `?ref=...`, incluir `affiliateRef: <esse valor>` no body de `POST
+  /api/orders`. Não validar nada no cliente — o backend já decide se o
+  ref é válido, o frontend só o passa adiante.
+
+**Lado do painel (`frontend/admin/afiliados.html`, ficheiro novo)** —
+mesmo layout das outras páginas do painel, sidebar sai de "Em breve"
+(`admin.js`, item `afiliados`: `href: 'afiliados.html', soon: false`):
+- 3 separadores: "Pendentes" / "Aprovados" / "Reprovados" (chamar `GET
+  /api/admin/affiliates?status=...` conforme o separador activo).
+  "Pendentes" activo por omissão.
+- Cada linha: nome/email do candidato, curso, data do pedido,
+  comissão (`commissionPct`%).
+- Em "Pendentes": botões "Aprovar" / "Reprovar" por linha, chamam
+  `PATCH /api/admin/affiliates/:id` com `{status:'APPROVED'}` ou
+  `{status:'REJECTED'}`, depois recarregam a lista.
+- Lista vazia: "Nenhuma solicitação pendente." (ou equivalente por
+  separador) — nunca uma tabela fantasma "a carregar" eterna.
+
+**Critérios de aceitação:**
+- Link de indicação só aparece com afiliação `APPROVED` de verdade
+  (vinda da API), nunca construído a partir de suposição no cliente.
+- `affiliateRef` só é lido do URL da própria página, nunca inventado.
+- Painel: aprovar/reprovar funciona e a lista actualiza sem reload da
+  página inteira.
+- Reaproveita `apiFetch`/`formatKz`/`initAdminPage`/tema — não duplica
+  nada de `app.js`/`admin.js`.
+- `node --check` limpo em todos os ficheiros tocados/criados.
+
 ## Notas da revisão do sénior
 
 - **Auth:** corrigido um side-channel de tempo no login — quando o email

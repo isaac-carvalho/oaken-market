@@ -137,6 +137,7 @@
       badge.className = 'enrolled-badge';
       badge.textContent = 'Já tens acesso';
       buyBox.appendChild(badge);
+      renderAffiliateBox(course);
       return;
     }
 
@@ -150,6 +151,114 @@
     btn.textContent = 'Comprar';
     btn.addEventListener('click', () => buyCourse(course, btn));
     buyBox.appendChild(btn);
+
+    renderAffiliateBox(course);
+  }
+
+  /**
+   * Mostra o estado de afiliação do utilizador para este curso. Só
+   * consulta a API se houver sessão activa — visitante sem login não vê
+   * nada de afiliados aqui.
+   */
+  async function renderAffiliateBox(course) {
+    let existing = document.getElementById('affiliate-box');
+    if (existing) existing.remove();
+
+    if (!localStorage.getItem('token')) return;
+
+    const box = document.createElement('div');
+    box.id = 'affiliate-box';
+    box.className = 'affiliate-box';
+    buyBox.appendChild(box);
+
+    try {
+      const data = await apiFetch('/api/affiliates/me');
+      const affiliates = data.affiliates || [];
+      const mine = affiliates.find((a) => a.course && a.course.slug === slug);
+      renderAffiliateState(box, course, mine);
+    } catch (err) {
+      // Falha silenciosa aqui — afiliados é um extra, não bloqueia a
+      // compra do curso.
+      box.remove();
+    }
+  }
+
+  function renderAffiliateState(box, course, affiliate) {
+    box.innerHTML = '';
+
+    if (!affiliate) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-outline btn-block';
+      btn.textContent = 'Tornar-me afiliado';
+      btn.addEventListener('click', () => requestAffiliation(course, box));
+      box.appendChild(btn);
+      return;
+    }
+
+    if (affiliate.status === 'PENDING') {
+      const p = document.createElement('p');
+      p.className = 'affiliate-note';
+      p.textContent = 'Pedido de afiliação em análise.';
+      box.appendChild(p);
+      return;
+    }
+
+    if (affiliate.status === 'REJECTED') {
+      const p = document.createElement('p');
+      p.className = 'affiliate-note';
+      p.textContent = 'Pedido de afiliação não aprovado.';
+      box.appendChild(p);
+      return;
+    }
+
+    if (affiliate.status === 'APPROVED') {
+      const link = `${window.location.origin}${window.location.pathname}?slug=${encodeURIComponent(slug)}&ref=${encodeURIComponent(affiliate.id)}`;
+
+      const label = document.createElement('p');
+      label.className = 'affiliate-note';
+      label.textContent = 'O teu link de indicação:';
+      box.appendChild(label);
+
+      const row = document.createElement('div');
+      row.className = 'affiliate-link-row';
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.readOnly = true;
+      input.value = link;
+      input.className = 'affiliate-link-input';
+      row.appendChild(input);
+
+      const copyBtn = document.createElement('button');
+      copyBtn.type = 'button';
+      copyBtn.className = 'btn btn-outline btn-sm';
+      copyBtn.textContent = 'Copiar';
+      copyBtn.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(link);
+          copyBtn.textContent = 'Copiado!';
+          setTimeout(() => { copyBtn.textContent = 'Copiar'; }, 2000);
+        } catch {
+          input.select();
+        }
+      });
+      row.appendChild(copyBtn);
+
+      box.appendChild(row);
+    }
+  }
+
+  async function requestAffiliation(course, box) {
+    try {
+      await apiFetch('/api/affiliates', {
+        method: 'POST',
+        body: JSON.stringify({ courseId: course.id }),
+      });
+      renderAffiliateState(box, course, { status: 'PENDING' });
+    } catch (err) {
+      showError(errorBox, err);
+    }
   }
 
   async function buyCourse(course, btn) {
@@ -165,9 +274,15 @@
     btn.textContent = 'A processar…';
 
     try {
+      const refParam = params.get('ref');
+      const orderBody = { courseId: course.id, provider: 'manual' };
+      if (refParam) {
+        orderBody.affiliateRef = refParam;
+      }
+
       const orderData = await apiFetch('/api/orders', {
         method: 'POST',
-        body: JSON.stringify({ courseId: course.id, provider: 'manual' }),
+        body: JSON.stringify(orderBody),
       });
 
       const providerRef = orderData.order.providerRef;

@@ -356,6 +356,35 @@ a.admin-nav-item:hover {
 
 .admin-table .muted { color: var(--text-muted); font-size: 13px; }
 
+.admin-table-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ============ TABS (Afiliados: Pendentes/Aprovados/Reprovados) ============ */
+.admin-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.admin-tab {
+  padding: 9px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-tab-active {
+  background: var(--secondary);
+  border-color: var(--secondary);
+  color: #fff;
+}
+
 /* ============ BADGES (status / publicado) ============ */
 .badge {
   display: inline-flex;
