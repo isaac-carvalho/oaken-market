@@ -454,7 +454,10 @@ a.admin-nav-item:hover {
 .modal-box h2 { font-size: 19px; font-weight: 800; margin-bottom: 18px; color: var(--text); }
 
 /* ============ RESPONSIVE ============ */
-@media (max-width: 900px) {
+/* Só colapsa para ícones-só num ecrã genuinamente estreito (telemóvel) —
+   a 900px isto disparava em janelas normais de portátil e ficava
+   ilegível (ícones sem legenda, sem contexto do que representam). */
+@media (max-width: 640px) {
   .admin-sidebar {
     position: static;
     width: 100%;

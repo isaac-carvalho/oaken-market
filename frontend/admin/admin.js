@@ -53,7 +53,7 @@ function renderAdminSidebar(activeKey) {
   nav.innerHTML = ADMIN_NAV_ITEMS.map((item) => {
     if (item.soon) {
       return `
-        <span class="admin-nav-item admin-nav-item-disabled" title="Ainda não disponível">
+        <span class="admin-nav-item admin-nav-item-disabled" title="${item.label} — ainda não disponível">
           <span class="admin-nav-icon">${item.icon}</span>
           <span class="admin-nav-label">${item.label}</span>
           <span class="admin-nav-soon">Em breve</span>
@@ -62,7 +62,7 @@ function renderAdminSidebar(activeKey) {
     }
     const active = item.key === activeKey ? ' admin-nav-item-active' : '';
     return `
-      <a class="admin-nav-item${active}" href="${item.href}">
+      <a class="admin-nav-item${active}" href="${item.href}" title="${item.label}">
         <span class="admin-nav-icon">${item.icon}</span>
         <span class="admin-nav-label">${item.label}</span>
       </a>
