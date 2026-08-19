@@ -367,6 +367,58 @@ sem enfeite fantasioso.
 - Não duplica `apiFetch`/`formatKz` — reaproveita de `app.js`.
 - `node --check` limpo em qualquer JS novo.
 
+## Tarefa 10 — Financeiro (carteira), saldo real (0 até haver pagamento real) ✅ concluída, revista pelo sénior
+
+Página nova `frontend/admin/financeiro.html`, sai de "Em breve" na
+sidebar (`admin.js`, `ADMIN_NAV_ITEMS` — item `financeiro` passa a ter
+`href: 'financeiro.html', soon: false`).
+
+**Regra central (é o motivo desta tarefa existir):** o saldo tem de vir
+de dinheiro real, nunca do provedor `manual` (esse é só para testar o
+fluxo de compra, nunca moveu dinheiro nenhum — ver
+`backend/src/services/payments/manualProvider.js`). Como hoje só existe
+o provedor manual, o saldo disponível vai dar **0 Kz**, e está certo
+estar assim — não é um placeholder, é o resultado real de excluir
+vendas de teste do dinheiro de verdade. Quando o provedor real
+(Multicaixa/Unitel) entrar, o saldo passa a reflectir vendas de verdade
+automaticamente, sem mexer em nada.
+
+**Backend — `GET /api/admin/wallet`** (adicionar a `admin.js`, mesmo
+padrão das outras rotas, atrás de `requireAuth(env)` + `requireAdmin`):
+```
+{
+  availableKz: <soma de Order.amountKz onde status=PAID e provider != 'manual'>,
+  pendingKz:   <soma de Order.amountKz onde status=PENDING e provider != 'manual'>,
+  totalKz:     availableKz + pendingKz
+}
+```
+Sem `from`/`to` — é o saldo actual, não um relatório por período.
+
+**Frontend (`frontend/admin/financeiro.html`)**, mesmo layout de
+sidebar/tema das outras páginas do painel:
+- Card "Saldo": Disponível / Pendente / Total (Kz), vindo de
+  `GET /api/admin/wallet`.
+- Aviso visível, sempre que `availableKz === 0`: "O saldo só conta
+  pagamentos confirmados por um provedor real. Ainda não há nenhum
+  ligado — por isso o saldo está a zero." (não esconder isto, é
+  informação importante, não um erro).
+- Botão "Solicitar saque" sempre desactivado por agora (`disabled`),
+  com texto "Disponível quando o pagamento real estiver ligado" —
+  nunca simular um pedido de saque que não existe.
+- Nenhum histórico de saques inventado — mostrar directamente "Sem
+  saques registados" (não há sistema de saque nenhum ainda, não faz
+  sentido fingir uma lista vazia "a carregar").
+
+**Critérios de aceitação:**
+- `manual` nunca entra no cálculo do saldo — testar mentalmente com a
+  compra real que já existe na BD (provider "manual", 299 000 Kz): não
+  pode aparecer no saldo.
+- Botão de saque nunca funcional, sempre claramente desactivado com o
+  motivo.
+- Reaproveita `apiFetch`/`formatKz`/`initAdminPage` — não duplica nada
+  de `app.js`/`admin.js`.
+- `node --check` limpo.
+
 ## Notas da revisão do sénior
 
 - **Auth:** corrigido um side-channel de tempo no login — quando o email

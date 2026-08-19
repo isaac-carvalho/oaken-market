@@ -453,6 +453,37 @@ a.admin-nav-item:hover {
 
 .modal-box h2 { font-size: 19px; font-weight: 800; margin-bottom: 18px; color: var(--text); }
 
+/* ============ FINANCEIRO (carteira) ============ */
+.wallet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.wallet-card.stat-card.stat-total { --stat-accent: var(--accent); }
+
+.alert-warning {
+  background: rgba(255, 107, 0, .12);
+  color: var(--secondary);
+  border: 1px solid rgba(255, 107, 0, .3);
+}
+
+.wallet-withdraw {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 20px 24px;
+}
+
+.wallet-withdraw-note {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
 /* ============ RESPONSIVE ============ */
 /* Só colapsa para ícones-só num ecrã genuinamente estreito (telemóvel) —
    a 900px isto disparava em janelas normais de portátil e ficava

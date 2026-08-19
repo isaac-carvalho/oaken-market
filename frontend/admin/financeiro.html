@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="pt-AO">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Financeiro — Painel Oaken Market</title>
+<script>
+  (function () {
+    if (localStorage.getItem('theme') === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  })();
+</script>
+<link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<div id="admin-blocked" class="admin-blocked hidden">
+  <div class="admin-blocked-box">
+    <div class="icon">🔒</div>
+    <h1>Acesso restrito</h1>
+    <p>Este painel é só para a conta administradora da Oaken Market. A tua conta não tem permissão para entrar aqui.</p>
+    <a class="btn btn-primary" href="../index.html">Voltar à loja</a>
+  </div>
+</div>
+
+<div id="admin-app" class="admin-layout hidden">
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar-brand">
+      <a class="logo" href="index.html">OAKEN <span>MARKET</span></a>
+      <span class="admin-tag">Painel do produtor</span>
+    </div>
+    <nav id="admin-nav"></nav>
+    <div class="admin-sidebar-footer">
+      <div id="admin-user"></div>
+      <button type="button" id="admin-logout-btn" class="btn btn-outline btn-sm btn-block">Sair</button>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div>
+        <h1 class="admin-title">Financeiro</h1>
+        <p class="admin-sub">Saldo da Oaken Market, só com pagamentos reais confirmados.</p>
+      </div>
+    </div>
+
+    <div id="error-box" class="alert alert-error hidden"></div>
+
+    <div id="zero-balance-notice" class="alert alert-warning hidden">
+      O saldo só conta pagamentos confirmados por um provedor real. Ainda não há nenhum ligado — por isso o saldo está a zero.
+    </div>
+
+    <div id="loading" class="loading-state">A carregar saldo…</div>
+
+    <div id="wallet-grid" class="wallet-grid hidden">
+      <div class="stat-card wallet-card stat-approved">
+        <div class="stat-label">Disponível</div>
+        <div class="stat-value" id="wallet-available-kz">—</div>
+      </div>
+      <div class="stat-card wallet-card stat-pending">
+        <div class="stat-label">Pendente</div>
+        <div class="stat-value" id="wallet-pending-kz">—</div>
+      </div>
+      <div class="stat-card wallet-card stat-total">
+        <div class="stat-label">Total</div>
+        <div class="stat-value" id="wallet-total-kz">—</div>
+      </div>
+    </div>
+
+    <div class="admin-panel">
+      <div class="admin-panel-header wallet-withdraw">
+        <div>
+          <h2>Saque</h2>
+          <div class="wallet-withdraw-note">Disponível quando o pagamento real estiver ligado.</div>
+        </div>
+        <button type="button" class="btn btn-primary" disabled title="Disponível quando o pagamento real estiver ligado">Solicitar saque</button>
+      </div>
+    </div>
+
+    <div class="admin-panel" style="margin-top: 20px;">
+      <div class="admin-panel-header">
+        <h2>Histórico de saques</h2>
+      </div>
+      <div class="empty-state">Sem saques registados.</div>
+    </div>
+  </main>
+</div>
+
+<script src="../app.js"></script>
+<script src="admin.js"></script>
+<script>
+  const user = initAdminPage('financeiro');
+
+  if (user) {
+    const loading = document.getElementById('loading');
+    const errorBox = document.getElementById('error-box');
+    const grid = document.getElementById('wallet-grid');
+    const zeroNotice = document.getElementById('zero-balance-notice');
+
+    async function loadWallet() {
+      clearError(errorBox);
+      loading.classList.remove('hidden');
+      grid.classList.add('hidden');
+      zeroNotice.classList.add('hidden');
+
+      try {
+        const wallet = await apiFetch('/api/admin/wallet');
+        loading.classList.add('hidden');
+        grid.classList.remove('hidden');
+
+        document.getElementById('wallet-available-kz').textContent = formatKz(wallet.availableKz);
+        document.getElementById('wallet-pending-kz').textContent = formatKz(wallet.pendingKz);
+        document.getElementById('wallet-total-kz').textContent = formatKz(wallet.totalKz);
+
+        if (wallet.availableKz === 0) {
+          zeroNotice.classList.remove('hidden');
+        }
+      } catch (err) {
+        loading.classList.add('hidden');
+        showError(errorBox, err);
+      }
+    }
+
+    loadWallet();
+  }
+</script>
+</body>
+</html>

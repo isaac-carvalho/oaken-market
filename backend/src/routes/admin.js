@@ -362,5 +362,47 @@ module.exports = function (env) {
     }
   });
 
+  // Saldo (carteira): soma só dinheiro REAL — nunca o provedor "manual"
+  // (esse é só para testar o fluxo de compra, nunca moveu dinheiro nenhum,
+  // ver services/payments/manualProvider.js). Sem from/to: é o saldo
+  // actual, não um relatório por período.
+  router.get('/wallet', async (req, res, next) => {
+    try {
+      const seller = await prisma.seller.findUniqueOrThrow({ where: { slug: SELLER_SLUG } });
+
+      const grouped = await prisma.order.groupBy({
+        by: ['status'],
+        where: {
+          course: { sellerId: seller.id },
+          status: { in: ['PAID', 'PENDING'] },
+          // Exclusão central desta rota: provider "manual" nunca entra no
+          // saldo, porque nunca moveu dinheiro real (é só teste de fluxo).
+          provider: { not: 'manual' },
+        },
+        _sum: { amountKz: true },
+      });
+
+      let availableKz = 0;
+      let pendingKz = 0;
+
+      for (const group of grouped) {
+        const kz = group._sum.amountKz || 0;
+        if (group.status === 'PAID') {
+          availableKz = kz;
+        } else if (group.status === 'PENDING') {
+          pendingKz = kz;
+        }
+      }
+
+      res.json({
+        availableKz,
+        pendingKz,
+        totalKz: availableKz + pendingKz,
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   return router;
 };

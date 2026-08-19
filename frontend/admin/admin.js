@@ -8,7 +8,7 @@ const ADMIN_NAV_ITEMS = [
   { key: 'produtos', href: 'produtos.html', icon: '📦', label: 'Produtos', soon: false },
   { key: 'vendas', href: 'vendas.html', icon: '💳', label: 'Vendas', soon: false },
   { key: 'afiliados', href: null, icon: '🤝', label: 'Afiliados', soon: true },
-  { key: 'financeiro', href: null, icon: '💰', label: 'Financeiro', soon: true },
+  { key: 'financeiro', href: 'financeiro.html', icon: '💰', label: 'Financeiro', soon: false },
   { key: 'integracoes', href: null, icon: '🔌', label: 'Integrações', soon: true },
   { key: 'ranking', href: null, icon: '🏆', label: 'Ranking', soon: true },
 ];
