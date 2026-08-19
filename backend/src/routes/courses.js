@@ -64,8 +64,11 @@ module.exports = function (env) {
                   order: true,
                   title: true,
                   durationMin: true,
-                  // contentHtml excluído de propósito — só entra depois de
-                  // confirmar Enrollment.
+                  // contentHtml vem sempre da BD aqui — quem decide se
+                  // chega ao cliente é o mapeamento abaixo, conforme
+                  // `enrolled`. Excluí-lo do select fazia o conteúdo nunca
+                  // chegar nem a quem já tinha pago.
+                  contentHtml: true,
                 },
               },
             },
