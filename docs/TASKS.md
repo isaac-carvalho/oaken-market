@@ -629,6 +629,37 @@ aparecem com `commissionKz: 0` (mesma regra de honestidade).
   com um valor inventado.
 - `node --check` limpo.
 
+## Tarefa 16 — Frontend de Ranking (dois rankings reais, sem gamificação) ✅ concluída, revista pelo sénior
+
+Backend pronto (Tarefa 15): `GET /api/admin/ranking/courses`, `GET
+/api/admin/ranking/affiliates`.
+
+Página nova `frontend/admin/ranking.html`, mesmo layout do painel.
+Sidebar sai de "Em breve" (`admin.js`, item `ranking`: `href:
+'ranking.html', soon: false`).
+
+- 2 separadores: "Cursos" (activo por omissão) e "Afiliados" — mesmo
+  padrão de separadores de `afiliados.html`.
+- "Cursos": tabela simples, posição (1º, 2º, 3º…), título do curso,
+  faturamento (`formatKz(salesKz)`), nº de vendas. Sem medalhas
+  fantasiosas nem badges de nível — é só uma tabela ordenada.
+- "Afiliados": posição, nome/email, curso, comissão gerada
+  (`formatKz(commissionKz)`), nº de vendas atribuídas.
+- Lista vazia (ex: nenhum afiliado aprovado ainda): "Ainda não há
+  afiliados aprovados." — nunca uma tabela fantasma.
+
+**Regra de honestidade (repetida de propósito — é o ponto central desta
+tarefa):** nada de níveis, planetas, medalhas de ouro/prata/bronze,
+percentagens de progresso para uma meta, ou qualquer estética de jogo.
+É uma tabela de desempenho, ponto final.
+
+**Critérios de aceitação:**
+- As duas tabelas mostram sempre dados reais da API, incluindo zeros
+  (cursos/afiliados sem venda aparecem, não desaparecem).
+- Nenhum elemento de gamificação (nível, badge, progresso, recompensa).
+- Reaproveita `apiFetch`/`formatKz`/`initAdminPage` — não duplica nada.
+- `node --check` limpo.
+
 ## Notas da revisão do sénior
 
 - **Auth:** corrigido um side-channel de tempo no login — quando o email

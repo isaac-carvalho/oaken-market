@@ -10,7 +10,7 @@ const ADMIN_NAV_ITEMS = [
   { key: 'afiliados', href: 'afiliados.html', icon: '🤝', label: 'Afiliados', soon: false },
   { key: 'financeiro', href: 'financeiro.html', icon: '💰', label: 'Financeiro', soon: false },
   { key: 'integracoes', href: 'integracoes.html', icon: '🔌', label: 'Integrações', soon: false },
-  { key: 'ranking', href: null, icon: '🏆', label: 'Ranking', soon: true },
+  { key: 'ranking', href: 'ranking.html', icon: '🏆', label: 'Ranking', soon: false },
 ];
 
 /**
