@@ -16,7 +16,7 @@ um provedor específico dentro das rotas.
 
 ---
 
-## Tarefa 1 — Autenticação (`backend/src/routes/auth.js`)
+## Tarefa 1 — Autenticação (`backend/src/routes/auth.js`) ✅ concluída, revista pelo sénior
 
 - `POST /api/auth/signup` — body `{ email, password, name }` validado com Zod
   (email válido, password mín. 8 caracteres com 1 número e 1 maiúscula, name
@@ -41,7 +41,7 @@ um provedor específico dentro das rotas.
 
 ---
 
-## Tarefa 2 — Cursos e Encomendas (`backend/src/routes/courses.js`, `orders.js`, `webhooks.js`)
+## Tarefa 2 — Cursos e Encomendas (`backend/src/routes/courses.js`, `orders.js`, `webhooks.js`) ✅ concluída, revista pelo sénior
 
 - `GET /api/courses` — lista cursos `published: true` do seller "oaken"
   (público, sem autenticação). Campos: id, slug, title, description,
@@ -72,6 +72,32 @@ um provedor específico dentro das rotas.
   do cliente (para não deixar o comprador escolher o preço).
 - Nenhuma rota de pagamento assume Multicaixa/Unitel directamente — só usa
   `getProvider()`.
+
+---
+
+## Notas da revisão do sénior
+
+- **Auth:** corrigido um side-channel de tempo no login — quando o email
+  não existe, o código antigo saltava o `bcrypt.compare` e respondia mais
+  rápido do que quando a senha estava errada, o que permitia adivinhar
+  emails registados pela diferença de tempo. Agora compara sempre contra
+  um hash (real ou "dummy"), timing igual nos dois casos.
+- **Cursos/Encomendas:** aprovado sem alterações — idempotência do webhook
+  bem feita (compare-and-set dentro da `$transaction`, não só um `if`
+  antes dela), preço sempre lido do `Course` na BD, `contentHtml` protegido
+  atrás de `Enrollment`.
+- Confirmando a dúvida do júnior da Tarefa 2: `req.user.sub` é mesmo o
+  `userId` (payload do JWT em `auth.js` é `{ sub: user.id, role }`).
+- Confirmando a outra dúvida: 404 (não 403) em curso não publicado está
+  correto — não revelar a um estranho que um slug existe é a escolha certa.
+
+### Backlog não-bloqueante (não impede seguir para o resto do MVP)
+
+- Índice único em `Order(provider, providerRef)` — hoje o webhook encontra
+  a encomenda por `findFirst`, funciona mas não tem a BD a garantir a
+  unicidade.
+- Impedir criar uma segunda `Order` para um curso que o utilizador já tem
+  `Enrollment` — hoje é possível pagar duas vezes pelo mesmo curso.
 
 ---
 
