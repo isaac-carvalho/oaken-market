@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="pt-AO">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Integrações — Painel Oaken Market</title>
+<script>
+  (function () {
+    if (localStorage.getItem('theme') === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  })();
+</script>
+<link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<div id="admin-blocked" class="admin-blocked hidden">
+  <div class="admin-blocked-box">
+    <div class="icon">🔒</div>
+    <h1>Acesso restrito</h1>
+    <p>Este painel é só para a conta administradora da Oaken Market. A tua conta não tem permissão para entrar aqui.</p>
+    <a class="btn btn-primary" href="../index.html">Voltar à loja</a>
+  </div>
+</div>
+
+<div id="admin-app" class="admin-layout hidden">
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar-brand">
+      <a class="logo" href="index.html">OAKEN <span>MARKET</span></a>
+      <span class="admin-tag">Painel do produtor</span>
+    </div>
+    <nav id="admin-nav"></nav>
+    <div class="admin-sidebar-footer">
+      <div id="admin-user"></div>
+      <button type="button" id="admin-logout-btn" class="btn btn-outline btn-sm btn-block">Sair</button>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div>
+        <h1 class="admin-title">Integrações</h1>
+        <p class="admin-sub">Webhooks de saída próprios da Oaken Market.</p>
+      </div>
+    </div>
+
+    <div id="error-box" class="alert alert-error hidden"></div>
+
+    <div class="alert alert-info">
+      Sempre que uma venda for confirmada, a Oaken Market envia um pedido <code>POST</code> a cada URL abaixo,
+      com o corpo assinado (cabeçalho <code>X-Oaken-Signature</code>, HMAC-SHA256 do corpo com o teu código secreto).
+    </div>
+
+    <div class="products-toolbar">
+      <button type="button" id="new-webhook-btn" class="btn btn-primary">+ Adicionar webhook</button>
+    </div>
+
+    <div id="loading" class="loading-state">A carregar webhooks…</div>
+
+    <div id="webhooks-panel" class="admin-panel hidden">
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>URL</th>
+              <th>Código (prévia)</th>
+              <th>Criado em</th>
+              <th>Estado</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="webhooks-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="empty-state" class="empty-state hidden">Ainda não registaste nenhum webhook.</div>
+  </main>
+</div>
+
+<!-- Modal: adicionar webhook -->
+<div id="modal-overlay" class="modal-overlay hidden">
+  <div class="modal-box">
+    <h2>Adicionar webhook</h2>
+    <div id="modal-error" class="alert alert-error hidden"></div>
+    <form id="webhook-form">
+      <div class="field">
+        <label for="w-url">URL de destino</label>
+        <input type="url" id="w-url" placeholder="https://exemplo.com/webhooks/oaken" required>
+      </div>
+      <div style="display:flex; gap:10px; margin-top:20px;">
+        <button type="button" id="modal-cancel-btn" class="btn btn-outline btn-block">Cancelar</button>
+        <button type="submit" id="modal-submit-btn" class="btn btn-primary btn-block">Adicionar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: mostrar secret (uma única vez) -->
+<div id="secret-modal-overlay" class="modal-overlay hidden">
+  <div class="modal-box">
+    <h2>Webhook criado</h2>
+    <div class="alert alert-warning">
+      Guarda este código agora — não vai voltar a ser mostrado. A Oaken Market não guarda uma cópia legível dele.
+    </div>
+    <div class="secret-reveal-box">
+      <span class="secret-reveal-code" id="secret-reveal-value"></span>
+      <button type="button" id="secret-copy-btn" class="btn btn-outline btn-sm">Copiar</button>
+    </div>
+    <div style="margin-top:20px;">
+      <button type="button" id="secret-close-btn" class="btn btn-primary btn-block">Entendi, já copiei</button>
+    </div>
+  </div>
+</div>
+
+<script src="../app.js"></script>
+<script src="admin.js"></script>
+<script>
+  const user = initAdminPage('integracoes');
+
+  if (user) {
+    const loading = document.getElementById('loading');
+    const errorBox = document.getElementById('error-box');
+    const panel = document.getElementById('webhooks-panel');
+    const tbody = document.getElementById('webhooks-tbody');
+    const emptyState = document.getElementById('empty-state');
+
+    const overlay = document.getElementById('modal-overlay');
+    const modalError = document.getElementById('modal-error');
+    const form = document.getElementById('webhook-form');
+    const submitBtn = document.getElementById('modal-submit-btn');
+
+    const secretOverlay = document.getElementById('secret-modal-overlay');
+    const secretValue = document.getElementById('secret-reveal-value');
+    const secretCopyBtn = document.getElementById('secret-copy-btn');
+    const secretCloseBtn = document.getElementById('secret-close-btn');
+
+    function openModal() {
+      form.reset();
+      clearError(modalError);
+      overlay.classList.remove('hidden');
+    }
+
+    function closeModal() {
+      overlay.classList.add('hidden');
+    }
+
+    function openSecretModal(secret) {
+      secretValue.textContent = secret;
+      secretCopyBtn.textContent = 'Copiar';
+      secretOverlay.classList.remove('hidden');
+    }
+
+    function closeSecretModal() {
+      secretOverlay.classList.add('hidden');
+      // Nunca guardar o secret completo em nenhuma variável depois de fechado.
+      secretValue.textContent = '';
+    }
+
+    document.getElementById('new-webhook-btn').addEventListener('click', openModal);
+    document.getElementById('modal-cancel-btn').addEventListener('click', closeModal);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+
+    secretCopyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(secretValue.textContent);
+        secretCopyBtn.textContent = 'Copiado!';
+      } catch {
+        secretCopyBtn.textContent = 'Não foi possível copiar';
+      }
+    });
+    secretCloseBtn.addEventListener('click', closeSecretModal);
+
+    function webhookRow(webhook) {
+      const tr = document.createElement('tr');
+
+      const stateBadge = webhook.active
+        ? '<span class="badge badge-published">Activo</span>'
+        : '<span class="badge badge-draft">Inactivo</span>';
+
+      const createdAt = new Date(webhook.createdAt).toLocaleString('pt-PT', {
+        day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+      });
+
+      tr.innerHTML = `
+        <td class="webhook-url">${webhook.url}</td>
+        <td class="muted">${webhook.secretPreview}</td>
+        <td class="muted">${createdAt}</td>
+        <td>${stateBadge}</td>
+        <td class="admin-table-actions"></td>
+      `;
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'btn btn-outline btn-sm';
+      removeBtn.textContent = 'Remover';
+      removeBtn.addEventListener('click', async () => {
+        const confirmed = confirm(`Remover o webhook "${webhook.url}"? Deixa de receber notificações de vendas confirmadas.`);
+        if (!confirmed) return;
+        removeBtn.disabled = true;
+        try {
+          await apiFetch(`/api/admin/webhooks/${webhook.id}`, { method: 'DELETE' });
+          await loadWebhooks();
+        } catch (err) {
+          showError(errorBox, err);
+          removeBtn.disabled = false;
+        }
+      });
+      tr.querySelector('.admin-table-actions').appendChild(removeBtn);
+
+      return tr;
+    }
+
+    async function loadWebhooks() {
+      clearError(errorBox);
+      loading.classList.remove('hidden');
+      panel.classList.add('hidden');
+      emptyState.classList.add('hidden');
+      tbody.innerHTML = '';
+
+      try {
+        const data = await apiFetch('/api/admin/webhooks');
+        loading.classList.add('hidden');
+
+        const webhooks = data.webhooks || [];
+        if (webhooks.length === 0) {
+          emptyState.classList.remove('hidden');
+          return;
+        }
+
+        webhooks.forEach((webhook) => tbody.appendChild(webhookRow(webhook)));
+        panel.classList.remove('hidden');
+      } catch (err) {
+        loading.classList.add('hidden');
+        showError(errorBox, err);
+      }
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearError(modalError);
+      submitBtn.disabled = true;
+
+      const url = document.getElementById('w-url').value.trim();
+
+      try {
+        const data = await apiFetch('/api/admin/webhooks', {
+          method: 'POST',
+          body: JSON.stringify({ url }),
+        });
+        closeModal();
+        await loadWebhooks();
+        openSecretModal(data.webhook.secret);
+      } catch (err) {
+        showError(modalError, err);
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    loadWebhooks();
+  }
+</script>
+</body>
+</html>

@@ -498,6 +498,36 @@ a.admin-nav-item:hover {
   border: 1px solid rgba(255, 107, 0, .3);
 }
 
+.alert-info {
+  background: var(--surface);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+/* ============ INTEGRAÇÕES (webhooks) ============ */
+.webhook-url {
+  word-break: break-all;
+}
+
+.secret-reveal-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin: 14px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.secret-reveal-code {
+  flex: 1;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  color: var(--text);
+  word-break: break-all;
+}
+
 .wallet-withdraw {
   display: flex;
   align-items: center;

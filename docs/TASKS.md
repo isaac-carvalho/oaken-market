@@ -564,6 +564,42 @@ sem regra especial) e gravá-los na `Order` tal como já se faz com
   exacto que é enviado.
 - `node --check` limpo em todos os ficheiros tocados.
 
+## Tarefa 14 — Frontend de Integrações (painel: gerir webhooks) ✅ concluída, revista pelo sénior
+
+Backend pronto (Tarefa 13): `GET/POST/DELETE /api/admin/webhooks`.
+
+Página nova `frontend/admin/integracoes.html`, mesmo layout das outras
+páginas do painel. Sidebar sai de "Em breve" (`admin.js`,
+`ADMIN_NAV_ITEMS`, item `integracoes`: `href: 'integracoes.html', soon:
+false`).
+
+- Lista de webhooks registados (`GET /api/admin/webhooks`): URL,
+  `secretPreview` (nunca o completo), data de criação, badge
+  activo/inactivo, botão remover (`DELETE /api/admin/webhooks/:id`,
+  confirmar com `confirm()` antes).
+- Formulário/modal "Adicionar webhook": campo URL (`type="url"`,
+  `required`). Ao submeter, `POST /api/admin/webhooks`. A resposta traz
+  o `secret` completo **uma única vez** — mostrar num modal/caixa
+  destacada com aviso claro ("Guarda este código agora — não vai voltar
+  a ser mostrado") e botão copiar, antes de voltar à lista.
+- Pequena nota explicativa no topo da página: "Sempre que uma venda for
+  confirmada, a Oaken Market envia um pedido `POST` a cada URL abaixo,
+  com o corpo assinado (cabeçalho `X-Oaken-Signature`, HMAC-SHA256 do
+  corpo com o teu código secreto)." — para o dono saber o que está a
+  configurar, mesmo sem documentação à parte.
+
+**Regra de honestidade:** nada de UTMfy/Otimizey/qualquer marca de
+terceiros — isto é só a gestão dos webhooks de saída próprios. Não
+mostrar histórico de entregas (o backend não guarda log de entregas
+nesta fase) nem inventar um.
+
+**Critérios de aceitação:**
+- `secret` completo só aparece na tela imediatamente a seguir à criação
+  — nunca mais depois disso (a lista só mostra `secretPreview`).
+- Remover pede confirmação antes de chamar a API.
+- Reaproveita `apiFetch`/`formatKz`/`initAdminPage` — não duplica nada.
+- `node --check` limpo.
+
 ## Notas da revisão do sénior
 
 - **Auth:** corrigido um side-channel de tempo no login — quando o email
