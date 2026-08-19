@@ -330,6 +330,43 @@ existe.
 - Reaproveita `apiFetch`/`formatKz`/tema de `app.js`, não duplica essa
   lógica.
 
+## Tarefa 9 — Dashboard: filtro de período + checklist "Próximos passos" ✅ concluída, revista pelo sénior
+
+Referência real (dono navegou no Hotmart de verdade): filtro de período
+acima dos cards de estatística, e um checklist de próximos passos
+("Editar produto", "Criar mais um produto", "Acessar área de membros").
+Copiar a ideia, não os dados nem a cor.
+
+**Filtro de período** (`frontend/admin/index.html`):
+- Botões: Hoje / 7 dias / 30 dias / Este ano / Tudo (parecido com o que
+  já existe em `oaken-cursos` se quiseres olhar o padrão de UI usado lá).
+  "30 dias" activo por omissão.
+- Ao mudar, recalcula `from`/`to` (ISO) e chama de novo `GET
+  /api/admin/stats?from=...&to=...` (o endpoint já aceita esses params,
+  ver Tarefa 7 em cima) — nada de filtrar no cliente, manda para a API.
+- "Tudo" = não manda `from`/`to`.
+
+**Checklist "Próximos passos"** (mesma página, card novo abaixo dos
+stats): compara com dados reais já disponíveis via `GET
+/api/admin/courses` (chamar essa rota também no dashboard):
+- ✅ "Criar o primeiro curso" — concluído se `courses.length > 0`.
+- ✅ "Publicar um curso" — concluído se algum `course.published === true`.
+- ⬜/✅ "Primeira venda" — concluído se `stats.approvedCount > 0`.
+Cada item concluído fica visualmente diferente (check verde) dos por
+fazer. Item não concluído tem um link para a página relevante
+(produtos.html para os dois primeiros).
+
+**Regra de honestidade:** nada de percentagem de "conquista" inventada
+nem de gamificação tipo "níveis" — é só um checklist de 3 itens reais,
+sem enfeite fantasioso.
+
+**Critérios de aceitação:**
+- Filtro realmente manda `from`/`to` para a API, não filtra em JS.
+- Checklist reflecte dados reais (cursos/publicação/vendas), nunca
+  hardcoded.
+- Não duplica `apiFetch`/`formatKz` — reaproveita de `app.js`.
+- `node --check` limpo em qualquer JS novo.
+
 ## Notas da revisão do sénior
 
 - **Auth:** corrigido um side-channel de tempo no login — quando o email

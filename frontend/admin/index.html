@@ -48,6 +48,15 @@
     </div>
 
     <div id="error-box" class="alert alert-error hidden"></div>
+
+    <div id="period-filter" class="period-filter">
+      <button type="button" class="period-btn" data-period="today">Hoje</button>
+      <button type="button" class="period-btn" data-period="7d">7 dias</button>
+      <button type="button" class="period-btn" data-period="30d">30 dias</button>
+      <button type="button" class="period-btn" data-period="year">Este ano</button>
+      <button type="button" class="period-btn" data-period="all">Tudo</button>
+    </div>
+
     <div id="loading" class="loading-state">A carregar estatísticas…</div>
 
     <div id="stats-grid" class="stats-grid hidden">
@@ -72,6 +81,13 @@
         <div class="stat-count">só encomendas pagas</div>
       </div>
     </div>
+
+    <div id="next-steps-card" class="admin-panel next-steps-card hidden">
+      <div class="admin-panel-header">
+        <h2>Próximos passos</h2>
+      </div>
+      <ul id="next-steps-list" class="next-steps-list"></ul>
+    </div>
   </main>
 </div>
 
@@ -80,14 +96,85 @@
 <script>
   const user = initAdminPage('dashboard');
 
+  // Devolve { from, to } em ISO para o período escolhido, ou {} para
+  // "all" (o backend, quando não recebe from/to, não filtra por data).
+  function periodToRange(period) {
+    const now = new Date();
+    const to = now.toISOString();
+    let from;
+
+    if (period === 'today') {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      from = start.toISOString();
+    } else if (period === '7d') {
+      from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    } else if (period === '30d') {
+      from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    } else if (period === 'year') {
+      from = new Date(now.getFullYear(), 0, 1).toISOString();
+    } else {
+      return {};
+    }
+
+    return { from, to };
+  }
+
+  function renderNextSteps(courses, stats) {
+    const hasCourse = courses.length > 0;
+    const hasPublished = courses.some((c) => c.published === true);
+    const hasSale = stats.approvedCount > 0;
+
+    const items = [
+      {
+        label: 'Criar o primeiro curso',
+        done: hasCourse,
+        href: 'produtos.html',
+      },
+      {
+        label: 'Publicar um curso',
+        done: hasPublished,
+        href: 'produtos.html',
+      },
+      {
+        label: 'Primeira venda',
+        done: hasSale,
+        href: 'vendas.html',
+      },
+    ];
+
+    const list = document.getElementById('next-steps-list');
+    list.innerHTML = items.map((item) => `
+      <li class="next-step-item${item.done ? ' next-step-done' : ''}">
+        <span class="next-step-check">${item.done ? '✅' : '⬜'}</span>
+        <span class="next-step-label">${item.label}</span>
+        ${item.done ? '' : `<a class="next-step-link" href="${item.href}">Ir lá →</a>`}
+      </li>
+    `).join('');
+
+    document.getElementById('next-steps-card').classList.remove('hidden');
+  }
+
   if (user) {
-    (async () => {
-      const loading = document.getElementById('loading');
-      const errorBox = document.getElementById('error-box');
-      const grid = document.getElementById('stats-grid');
+    let currentPeriod = '30d';
+
+    const loading = document.getElementById('loading');
+    const errorBox = document.getElementById('error-box');
+    const grid = document.getElementById('stats-grid');
+    const periodFilter = document.getElementById('period-filter');
+
+    async function loadDashboard() {
+      loading.classList.remove('hidden');
+      clearError(errorBox);
 
       try {
-        const stats = await apiFetch('/api/admin/stats');
+        const { from, to } = periodToRange(currentPeriod);
+        const query = from && to ? `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}` : '';
+
+        const [stats, coursesRes] = await Promise.all([
+          apiFetch(`/api/admin/stats${query}`),
+          apiFetch('/api/admin/courses'),
+        ]);
+
         loading.classList.add('hidden');
         grid.classList.remove('hidden');
 
@@ -101,11 +188,28 @@
         document.getElementById('stat-cancelled-count').textContent = `${stats.cancelledCount} encomenda(s)`;
 
         document.getElementById('stat-avg-kz').textContent = formatKz(stats.avgTicketKz);
+
+        renderNextSteps(coursesRes.courses || [], stats);
       } catch (err) {
         loading.classList.add('hidden');
         showError(errorBox, err);
       }
-    })();
+    }
+
+    periodFilter.addEventListener('click', (evt) => {
+      const btn = evt.target.closest('.period-btn');
+      if (!btn) return;
+      currentPeriod = btn.dataset.period;
+      Array.from(periodFilter.querySelectorAll('.period-btn')).forEach((b) => {
+        b.classList.toggle('period-btn-active', b === btn);
+      });
+      loadDashboard();
+    });
+
+    const defaultBtn = periodFilter.querySelector(`[data-period="${currentPeriod}"]`);
+    if (defaultBtn) defaultBtn.classList.add('period-btn-active');
+
+    loadDashboard();
   }
 </script>
 </body>

@@ -166,6 +166,74 @@ a.admin-nav-item:hover {
 .admin-blocked-box h1 { font-size: 20px; font-weight: 800; margin-bottom: 10px; color: var(--text); }
 .admin-blocked-box p { color: var(--text-muted); font-size: 14px; margin-bottom: 22px; }
 
+/* ============ PERIOD FILTER (dashboard) ============ */
+.period-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.period-btn {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color .2s ease, color .2s ease, border-color .2s ease;
+}
+
+.period-btn:hover {
+  border-color: var(--secondary);
+  color: var(--text);
+}
+
+.period-btn-active {
+  background: var(--secondary);
+  border-color: var(--secondary);
+  color: #ffffff;
+}
+
+/* ============ NEXT STEPS (dashboard) ============ */
+.next-steps-card { margin-top: 4px; }
+
+.next-steps-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.next-step-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  color: var(--text);
+}
+
+.next-step-item:last-child { border-bottom: none; }
+
+.next-step-check { font-size: 15px; }
+
+.next-step-label { flex: 1; }
+
+.next-step-item.next-step-done .next-step-label {
+  color: var(--text-muted);
+}
+
+.next-step-link {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--secondary);
+  white-space: nowrap;
+}
+
 /* ============ STAT CARDS ============ */
 .stats-grid {
   display: grid;
