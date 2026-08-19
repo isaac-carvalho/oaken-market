@@ -75,6 +75,45 @@ um provedor específico dentro das rotas.
 
 ---
 
+## Tarefa 3 — Administração de conteúdo (`backend/src/routes/admin.js`)
+
+Sem isto não há forma de a Oaken publicar um curso — falta a peça que
+liga o schema (Course/Module/Lesson) a alguém a escrever conteúdo.
+Rotas todas atrás de `requireAuth(env)` + `requireAdmin` (já existem em
+`middleware/auth.js`).
+
+- `POST /api/admin/courses` — cria curso. Body: `{ slug, title,
+  description, priceKz, coverUrl? }`. `slug` só `[a-z0-9-]`, único (Zod +
+  regex). `priceKz` inteiro positivo. `sellerId` nunca vem do body — vai
+  sempre buscar o seller "oaken" (`prisma.seller.findUniqueOrThrow({where:
+  {slug: 'oaken'}})`), como fizeram nas rotas de cursos/encomendas.
+  `published` começa sempre `false` (curso nasce em rascunho).
+- `PATCH /api/admin/courses/:id` — actualiza campos do curso (title,
+  description, priceKz, coverUrl, published). Não deixar mudar `slug`
+  nem `sellerId` por aqui (evita partir URLs já partilhadas).
+- `POST /api/admin/courses/:id/modules` — cria módulo. Body: `{ order,
+  title }`. `order` tem de ser único dentro do curso (o schema já tem
+  `@@unique([courseId, order])` — apanhar o erro P2002 do Prisma e devolver
+  409 com mensagem clara, não deixar rebentar como 500).
+- `POST /api/admin/modules/:id/lessons` — cria aula. Body: `{ order,
+  title, contentHtml, durationMin? }`. Mesma lógica de `order` único
+  (`@@unique([moduleId, order])`) e mesmo tratamento de P2002.
+- `PATCH /api/admin/lessons/:id` — actualiza `title`/`contentHtml`/
+  `durationMin` de uma aula já criada (para corrigir texto sem recriar).
+
+**Critérios de aceitação (sénior valida):**
+- Nenhuma rota aceita `sellerId` do body — vem sempre do seller "oaken"
+  fixo, para não abrir brecha de um curso aparecer sob outro vendedor.
+- `slug` validado com regex antes de ir à BD (nada de espaços, maiúsculas
+  ou acentos — vai para o URL).
+- Conflito de `order` dentro do mesmo curso/módulo devolve 409, não 500.
+- Um pedido sem token, ou com token de utilizador BUYER, recebe 401/403 —
+  testar mentalmente os dois casos e confirmar no código que
+  `requireAuth` + `requireAdmin` estão mesmo montados antes do handler.
+- Ligar a rota em `src/index.js`: `app.use('/api/admin',
+  require('./routes/admin')(env))` — hoje esse `require` ainda não existe
+  lá, tens de o adicionar.
+
 ## Notas da revisão do sénior
 
 - **Auth:** corrigido um side-channel de tempo no login — quando o email

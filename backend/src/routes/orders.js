@@ -30,6 +30,13 @@ module.exports = function (env) {
         return next(new HttpError(404, 'Curso não encontrado'));
       }
 
+      const existingEnrollment = await prisma.enrollment.findUnique({
+        where: { userId_courseId: { userId: req.user.sub, courseId: course.id } },
+      });
+      if (existingEnrollment) {
+        return next(new HttpError(409, 'Já tem acesso a este curso'));
+      }
+
       // O preço cobrado vem sempre do Course guardado na BD — nunca de um
       // valor enviado pelo cliente no body do pedido.
       const order = await prisma.order.create({
