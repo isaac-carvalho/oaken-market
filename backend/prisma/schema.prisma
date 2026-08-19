@@ -57,6 +57,7 @@ model Seller {
   createdAt DateTime @default(now())
 
   courses   Course[]
+  webhooks  WebhookEndpoint[]
 }
 
 model Course {
@@ -116,6 +117,12 @@ model Order {
   createdAt   DateTime    @default(now())
   paidAt      DateTime?
 
+  // UTM capturados na página do curso no momento da compra (opcional) —
+  // permitem ver de que campanha veio cada venda.
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+
   // Indicação (opcional) — preenchida se a compra veio de um link de
   // afiliado aprovado. commissionKz é só informativo (o que o afiliado
   // teria a receber) — não existe saque de comissão enquanto não houver
@@ -143,6 +150,19 @@ model Affiliate {
   orders        Order[]
 
   @@unique([userId, courseId])
+}
+
+// Webhook de saída — o painel de produtor regista um URL, o backend
+// chama-o (POST, assinado com HMAC do secret) quando uma encomenda fica
+// PAID. Pensado para o dono ligar isto a automações próprias (ex: n8n).
+model WebhookEndpoint {
+  id        String   @id @default(uuid())
+  sellerId  String
+  seller    Seller   @relation(fields: [sellerId], references: [id])
+  url       String
+  secret    String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
 }
 
 model Enrollment {

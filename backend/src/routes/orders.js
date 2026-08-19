@@ -12,6 +12,12 @@ const createOrderSchema = z.object({
   // isso aqui não se valida a forma como uuid (um valor mal formado não
   // deve dar 400, só é ignorado mais abaixo ao tentar encontrar o Affiliate).
   affiliateRef: z.string().trim().min(1).optional(),
+  // UTM capturados na página do curso no momento da compra — opcionais,
+  // sem regra especial de formato (só strings simples), mesma lógica do
+  // affiliateRef: nunca podem rebentar a compra.
+  utmSource: z.string().trim().min(1).optional(),
+  utmMedium: z.string().trim().min(1).optional(),
+  utmCampaign: z.string().trim().min(1).optional(),
 });
 
 module.exports = function (env) {
@@ -23,7 +29,7 @@ module.exports = function (env) {
       if (!parsed.success) {
         return next(new HttpError(400, parsed.error.issues[0]?.message || 'Dados inválidos'));
       }
-      const { courseId, provider, affiliateRef } = parsed.data;
+      const { courseId, provider, affiliateRef, utmSource, utmMedium, utmCampaign } = parsed.data;
 
       // getProvider valida o nome do provedor antes de tocar na BD — se for
       // desconhecido, falha cedo com 400.
@@ -66,6 +72,9 @@ module.exports = function (env) {
           amountKz: course.priceKz,
           status: 'PENDING',
           provider,
+          ...(utmSource ? { utmSource } : {}),
+          ...(utmMedium ? { utmMedium } : {}),
+          ...(utmCampaign ? { utmCampaign } : {}),
           ...(approvedAffiliate
             ? {
                 affiliateId: approvedAffiliate.id,

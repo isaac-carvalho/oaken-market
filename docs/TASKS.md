@@ -515,6 +515,55 @@ mesmo layout das outras páginas do painel, sidebar sai de "Em breve"
   nada de `app.js`/`admin.js`.
 - `node --check` limpo em todos os ficheiros tocados/criados.
 
+## Tarefa 13 — Backend de Integrações: webhooks de saída + captura de UTM ✅ concluída, revista pelo sénior
+
+Schema já migrado (`WebhookEndpoint`, `Order.utmSource/utmMedium/utmCampaign`
+— ver `backend/prisma/schema.prisma`). Nada de simular integrações com
+produtos de terceiros (UTMfy, Otimizey) — isso não existe aqui, seria
+mentira. É webhook de saída de verdade + UTM de verdade.
+
+**Webhooks — `GET/POST/DELETE /api/admin/webhooks`** (adicionar a
+`admin.js`, mesmo padrão de sempre, seller fixo "oaken"):
+- `GET /api/admin/webhooks` — lista os endpoints do seller. **Nunca**
+  devolver o campo `secret` completo nesta rota — só os últimos 4
+  caracteres (ex: `"secretPreview": "…a1b2"`), para o dono conseguir
+  reconhecer qual é qual sem o segredo poder vazar por aqui.
+- `POST /api/admin/webhooks` — body `{ url }` (Zod, `.url()`). Gera um
+  `secret` aleatório forte no servidor (`crypto.randomBytes(32).toString('hex')`)
+  — devolve o `secret` completo **só nesta resposta**, uma única vez (é
+  a única oportunidade de o dono o copiar, como uma API key normal).
+- `DELETE /api/admin/webhooks/:id` — remove. 404 se não existir.
+
+**Disparo do webhook (`backend/src/routes/webhooks.js`, já existe)**:
+depois de uma `Order` ficar `PAID` (dentro/depois da transacção que já
+existe), buscar os `WebhookEndpoint` activos do seller "oaken" e para
+cada um fazer `POST` ao `url` registado com:
+```
+body: { event: 'order.paid', orderId, courseId, amountKz, commissionKz, paidAt }
+header: X-Oaken-Signature: <hex HMAC-SHA256 do JSON do body, usando o secret>
+```
+Usar `fetch` nativo do Node (já disponível), com um timeout curto (ex:
+5s via `AbortController`) — **nunca deixar uma falha de rede num
+webhook externo rebentar a confirmação do pagamento**: o disparo corre
+depois da `Order` já estar confirmada como `PAID`, envolto em `try/catch`
+que só regista o erro (`console.error`), nunca propaga.
+
+**Captura de UTM em `POST /api/orders`
+(`backend/src/routes/orders.js`, já existe)**: aceitar campos opcionais
+`utmSource`, `utmMedium`, `utmCampaign` no body (Zod, strings simples,
+sem regra especial) e gravá-los na `Order` tal como já se faz com
+`affiliateRef`.
+
+**Critérios de aceitação:**
+- `secret` completo nunca aparece em `GET /api/admin/webhooks` — só a
+  prévia de 4 caracteres.
+- Falha ao chamar um webhook externo (URL fora do ar, timeout) nunca
+  impede a compra/confirmação de pagamento — testar mentalmente com um
+  URL que não responde.
+- `X-Oaken-Signature` calculado correctamente com HMAC-SHA256 do body
+  exacto que é enviado.
+- `node --check` limpo em todos os ficheiros tocados.
+
 ## Notas da revisão do sénior
 
 - **Auth:** corrigido um side-channel de tempo no login — quando o email

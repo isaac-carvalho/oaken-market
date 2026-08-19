@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const { z } = require('zod');
 const { Prisma } = require('@prisma/client');
 const { prisma } = require('../config/prisma');
@@ -66,6 +67,12 @@ const listAffiliatesQuerySchema = z
 const updateAffiliateSchema = z
   .object({
     status: z.enum(['APPROVED', 'REJECTED']),
+  })
+  .strict();
+
+const createWebhookSchema = z
+  .object({
+    url: z.string().trim().url('url inválido'),
   })
   .strict();
 
@@ -470,6 +477,82 @@ module.exports = function (env) {
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
         return next(new HttpError(404, 'Afiliação não encontrada'));
+      }
+      next(err);
+    }
+  });
+
+  // Lista os endpoints de webhook do seller "oaken". O `secret` completo
+  // NUNCA sai daqui — só a prévia dos últimos 4 caracteres, para o dono
+  // conseguir reconhecer qual é qual sem o segredo poder vazar por esta
+  // rota (ex: numa captura de ecrã ou log de rede).
+  router.get('/webhooks', async (req, res, next) => {
+    try {
+      const seller = await prisma.seller.findUniqueOrThrow({ where: { slug: SELLER_SLUG } });
+
+      const webhooks = await prisma.webhookEndpoint.findMany({
+        where: { sellerId: seller.id },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          url: true,
+          active: true,
+          createdAt: true,
+          secret: true,
+        },
+      });
+
+      res.json({
+        webhooks: webhooks.map(({ secret, ...rest }) => ({
+          ...rest,
+          secretPreview: `…${secret.slice(-4)}`,
+        })),
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // Regista um novo endpoint de webhook. O `secret` gerado aqui é devolvido
+  // completo só nesta resposta, uma única vez — como uma API key normal, é
+  // a única oportunidade de o dono o copiar (GET /webhooks nunca o mostra).
+  router.post('/webhooks', async (req, res, next) => {
+    try {
+      const parsed = createWebhookSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return next(new HttpError(400, parsed.error.issues[0]?.message || 'Dados inválidos'));
+      }
+      const { url } = parsed.data;
+
+      const seller = await prisma.seller.findUniqueOrThrow({ where: { slug: SELLER_SLUG } });
+
+      const secret = crypto.randomBytes(32).toString('hex');
+
+      const webhook = await prisma.webhookEndpoint.create({
+        data: { sellerId: seller.id, url, secret },
+      });
+
+      res.status(201).json({
+        webhook: {
+          id: webhook.id,
+          url: webhook.url,
+          active: webhook.active,
+          createdAt: webhook.createdAt,
+          secret: webhook.secret,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.delete('/webhooks/:id', async (req, res, next) => {
+    try {
+      await prisma.webhookEndpoint.delete({ where: { id: req.params.id } });
+      res.status(204).end();
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+        return next(new HttpError(404, 'Webhook não encontrado'));
       }
       next(err);
     }
