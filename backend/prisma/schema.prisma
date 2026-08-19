@@ -1,0 +1,116 @@
+// Oaken Market — schema da base de dados
+// MVP: só a Oaken vende. O modelo já separa "Seller" de "Course" para que,
+// mais tarde, abrir a plataforma a outros criadores seja adicionar linhas
+// a Seller e ligar user->seller, sem mexer no resto do schema.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  BUYER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         UserRole @default(BUYER)
+  createdAt    DateTime @default(now())
+
+  orders       Order[]
+  enrollments  Enrollment[]
+}
+
+model Seller {
+  id        String   @id @default(uuid())
+  slug      String   @unique
+  name      String
+  createdAt DateTime @default(now())
+
+  courses   Course[]
+}
+
+model Course {
+  id          String   @id @default(uuid())
+  sellerId    String
+  seller      Seller   @relation(fields: [sellerId], references: [id])
+  slug        String   @unique
+  title       String
+  description String
+  priceKz     Int
+  coverUrl    String?
+  published   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  modules     Module[]
+  orders      Order[]
+  enrollments Enrollment[]
+}
+
+model Module {
+  id       String   @id @default(uuid())
+  courseId String
+  course   Course   @relation(fields: [courseId], references: [id])
+  order    Int
+  title    String
+
+  lessons  Lesson[]
+
+  @@unique([courseId, order])
+}
+
+model Lesson {
+  id          String  @id @default(uuid())
+  moduleId    String
+  module      Module  @relation(fields: [moduleId], references: [id])
+  order       Int
+  title       String
+  contentHtml String
+  durationMin Int     @default(50)
+
+  @@unique([moduleId, order])
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id])
+  courseId    String
+  course      Course      @relation(fields: [courseId], references: [id])
+  amountKz    Int
+  status      OrderStatus @default(PENDING)
+  provider    String
+  providerRef String?
+  createdAt   DateTime    @default(now())
+  paidAt      DateTime?
+
+  enrollment  Enrollment?
+}
+
+model Enrollment {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id])
+  orderId   String   @unique
+  order     Order    @relation(fields: [orderId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, courseId])
+}
