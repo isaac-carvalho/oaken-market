@@ -419,6 +419,54 @@ sidebar/tema das outras páginas do painel:
   de `app.js`/`admin.js`.
 - `node --check` limpo.
 
+## Tarefa 11 — Backend de Afiliados ✅ concluída, revista pelo sénior
+
+Schema já migrado (`Affiliate`, `Order.affiliateId`, `Order.commissionKz`
+— ver `backend/prisma/schema.prisma`). Rotas novas.
+
+**Lado do afiliado (`backend/src/routes/affiliates.js`, ficheiro novo,
+montar em `src/index.js` como `app.use('/api/affiliates',
+require('./routes/affiliates')(env));`)** — atrás de `requireAuth(env)`:
+- `POST /api/affiliates` — body `{ courseId }`. Cria `Affiliate` com
+  `status: PENDING` para o utilizador autenticado + esse curso. Erro 409
+  se já existir pedido para esse par utilizador/curso (constraint
+  `@@unique([userId, courseId])` já existe — apanhar P2002). 404 se o
+  curso não existir ou não estiver publicado.
+- `GET /api/affiliates/me` — lista as afiliações do próprio utilizador
+  autenticado (todas, qualquer status), com `course: {title, slug}`.
+
+**Lado do admin (adicionar a `backend/src/routes/admin.js`, mesmo
+padrão de sempre)**:
+- `GET /api/admin/affiliates?status=PENDING|APPROVED|REJECTED` — lista
+  afiliações do seller "oaken" (via `course.sellerId`), com
+  `user:{name,email}` e `course:{title,slug}`. Sem `status`, devolve
+  todas.
+- `PATCH /api/admin/affiliates/:id` — body `{ status: 'APPROVED' |
+  'REJECTED' }` (Zod enum, `.strict()`). Define `decidedAt`. 404 se não
+  existir.
+
+**Atribuição de comissão em `POST /api/orders`
+(`backend/src/routes/orders.js`, já existe)**: aceitar um campo opcional
+`affiliateRef` no body (é o `id` do `Affiliate`). Se vier: procurar o
+`Affiliate` com esse id, e só o aceitar se `status === 'APPROVED'` **e**
+`courseId` bater com o curso a comprar — caso contrário, ignorar
+silenciosamente (não rebentar a compra por causa de um `ref` inválido
+ou adulterado, só não atribui comissão). Se válido, guardar
+`affiliateId` na `Order` e calcular `commissionKz = Math.round(amountKz
+* affiliate.commissionPct / 100)` — mas só grava o valor, não paga nada
+(mesma regra do saldo em Financeiro: comissão é só informação até
+existir dinheiro real).
+
+**Critérios de aceitação:**
+- Um utilizador nunca vê afiliações de outro em `/affiliates/me` (usa
+  sempre `req.user.sub`).
+- `affiliateRef` adulterado (id de outro curso, ou de uma afiliação
+  ainda `PENDING`) nunca atribui comissão — a compra continua a
+  funcionar normalmente, só sem `affiliateId`.
+- `PATCH /api/admin/affiliates/:id` só aceita `APPROVED`/`REJECTED`
+  (Zod enum) — qualquer outra coisa dá 400.
+- `node --check` limpo em todos os ficheiros tocados.
+
 ## Notas da revisão do sénior
 
 - **Auth:** corrigido um side-channel de tempo no login — quando o email

@@ -26,6 +26,7 @@ app.use('/api/courses', require('./routes/courses')(env));
 app.use('/api/orders', require('./routes/orders')(env));
 app.use('/api/webhooks', require('./routes/webhooks')(env));
 app.use('/api/admin', require('./routes/admin')(env));
+app.use('/api/affiliates', require('./routes/affiliates')(env));
 
 app.use(notFound);
 app.use(errorHandler);

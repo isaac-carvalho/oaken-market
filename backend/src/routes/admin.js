@@ -55,6 +55,20 @@ const updateLessonSchema = z
 
 const ORDER_STATUSES = ['PENDING', 'PAID', 'FAILED', 'REFUNDED'];
 
+const AFFILIATE_STATUSES = ['PENDING', 'APPROVED', 'REJECTED'];
+
+const listAffiliatesQuerySchema = z
+  .object({
+    status: z.enum(AFFILIATE_STATUSES).optional(),
+  })
+  .strict();
+
+const updateAffiliateSchema = z
+  .object({
+    status: z.enum(['APPROVED', 'REJECTED']),
+  })
+  .strict();
+
 const listOrdersQuerySchema = z
   .object({
     status: z.enum(ORDER_STATUSES).optional(),
@@ -400,6 +414,63 @@ module.exports = function (env) {
         totalKz: availableKz + pendingKz,
       });
     } catch (err) {
+      next(err);
+    }
+  });
+
+  // Lista afiliações do seller "oaken" (via course.sellerId). Sem `status`,
+  // devolve todas.
+  router.get('/affiliates', async (req, res, next) => {
+    try {
+      const parsed = listAffiliatesQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        return next(new HttpError(400, parsed.error.issues[0]?.message || 'Parâmetros inválidos'));
+      }
+      const { status } = parsed.data;
+
+      const seller = await prisma.seller.findUniqueOrThrow({ where: { slug: SELLER_SLUG } });
+
+      const affiliates = await prisma.affiliate.findMany({
+        where: {
+          course: { sellerId: seller.id },
+          ...(status ? { status } : {}),
+        },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          status: true,
+          commissionPct: true,
+          createdAt: true,
+          decidedAt: true,
+          user: { select: { name: true, email: true } },
+          course: { select: { title: true, slug: true } },
+        },
+      });
+
+      res.json({ affiliates });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.patch('/affiliates/:id', async (req, res, next) => {
+    try {
+      const parsed = updateAffiliateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return next(new HttpError(400, parsed.error.issues[0]?.message || 'Dados inválidos'));
+      }
+      const { status } = parsed.data;
+
+      const affiliate = await prisma.affiliate.update({
+        where: { id: req.params.id },
+        data: { status, decidedAt: new Date() },
+      });
+
+      res.json({ affiliate });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+        return next(new HttpError(404, 'Afiliação não encontrada'));
+      }
       next(err);
     }
   });
