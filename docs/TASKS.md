@@ -157,6 +157,49 @@ Ficheiros:
   `npx serve frontend` ou `python -m http.server` dentro de `frontend/`)
   com o backend a correr em paralelo em `localhost:5000`.
 
+## Tarefa 5 — Redesign visual da loja (Hotmart-like) ✅ concluída, revista pelo sénior
+
+Objectivo: a loja (`frontend/`) tem de parecer uma plataforma de venda de
+cursos moderna e profissional (referência: Hotmart, Kiwify) — não uma
+página de curso isolada. Continua HTML/CSS/JS puro, sem framework, sem
+build step. Não mexer na lógica de `app.js` (`apiFetch`, `formatKz`,
+`logout`) nem no contrato com a API — só visual/estrutura.
+
+**Linguagem visual:**
+- Paleta: manter navy `#0B1F3A` + laranja `#FF6B00` (marca Oaken, usada em
+  todos os outros produtos), mas com mais respiração, sombras suaves,
+  cantos arredondados (12-20px), gradientes subtis no hero.
+- Tipografia: Segoe UI / system-ui, hierarquia clara (hero grande e
+  ousado, corpo legível).
+- `index.html`: hero de topo (título + subtítulo + CTA), depois grid de
+  cursos em cards com imagem de capa (`coverUrl`), título, descrição
+  curta, preço em destaque, badge de módulos/carga horária se a API
+  devolver isso. Cards com hover (leve elevação/zoom).
+- `curso.html`: banner com a capa do curso, título grande, descrição,
+  caixa de compra fixa/destacada (estilo "sidebar de produto" da
+  Hotmart — preço grande, botão de compra grande, o que está incluído).
+  Lista de módulos/aulas abaixo, com cadeados visuais claros em aulas
+  bloqueadas.
+- `login.html`: cartão centrado, visual consistente com o resto.
+- Header fixo em todas as páginas: logo, e à direita nome/sair OU botão
+  entrar (lógica já existe em `renderHeader()`, só o estilo muda).
+
+**Regra de honestidade (importante):** não inventar prova social falsa —
+nada de "1000+ alunos", estrelas de avaliação, ou depoimentos fabricados.
+Se quiseres um elemento de confiança, usa algo verdadeiro e genérico
+("Certificado por módulo", "Conteúdo actualizado", "Suporte via
+WhatsApp") — nunca um número ou testemunho inventado.
+
+**Critérios de aceitação:**
+- `apiFetch`, `formatKz`, `logout`, `renderHeader`, `showError`,
+  `clearError` em `app.js` continuam com a mesma assinatura — as 3
+  páginas continuam a chamá-las como antes.
+- Nenhum dado falso/inventado (contadores, avaliações, depoimentos).
+- Responsivo: grid de cursos quebra para 1 coluna em ecrã estreito
+  (usa `@media` como o resto dos projectos Oaken).
+- `contentHtml` continua só visível quando a API devolve `enrolled:true`
+  — o redesign não pode alterar essa lógica em `curso.html`.
+
 ## Notas da revisão do sénior
 
 - **Auth:** corrigido um side-channel de tempo no login — quando o email
