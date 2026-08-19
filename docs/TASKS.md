@@ -114,6 +114,49 @@ Rotas todas atrás de `requireAuth(env)` + `requireAdmin` (já existem em
   require('./routes/admin')(env))` — hoje esse `require` ainda não existe
   lá, tens de o adicionar.
 
+## Tarefa 4 — Frontend: loja + checkout (`frontend/`) ✅ concluída, revista pelo sénior
+
+HTML/CSS/JS puro (sem framework, sem build step) — mesmo estilo do resto
+dos projectos Oaken (ver `oaken-cursos/*/index.html` como referência de
+visual: navy `#0B1F3A` + laranja `#FF6B00`, cards, fonte Segoe UI). Base
+da API: `http://localhost:5000` (backend já a correr).
+
+Ficheiros:
+- `frontend/index.html` — lista cursos publicados (`GET /api/courses`).
+  Card por curso: título, descrição, `priceKz` formatado (ex: "50 000 Kz"),
+  botão que leva a `curso.html?slug=...`.
+- `frontend/curso.html` — detalhe do curso (`GET /api/courses/:slug`,
+  manda o token no header `Authorization` se existir em `localStorage`).
+  Mostra módulos/aulas; se `enrolled:false`, aulas aparecem só com título
+  (cadeado); se `enrolled:true`, mostra `contentHtml` de cada aula. Botão
+  "Comprar" chama `POST /api/orders` com `{courseId, provider:"manual"}`
+  (só há o provedor manual por agora — o real ainda não está ligado).
+  Depois de criar a encomenda, chama automaticamente
+  `POST /api/webhooks/manual` com o `providerRef` devolvido, para simular
+  a confirmação de pagamento (isto é só para testar o fluxo agora — quando
+  o provedor real entrar, este passo desaparece e o pagamento confirma-se
+  sozinho). Depois disso, recarrega o curso para mostrar o conteúdo.
+- `frontend/login.html` — formulário de login/signup (toggle entre os
+  dois). Guarda `token` e `user` em `localStorage` depois de
+  `POST /api/auth/login` ou `/signup`. Redireciona para `index.html`.
+- `frontend/app.js` (partilhado) — funções: `apiFetch(path, opts)` (junta
+  `Authorization: Bearer <token>` do localStorage automaticamente se
+  existir), `formatKz(n)`, `logout()`, `renderHeader()` (mostra nome do
+  utilizador + botão sair, ou botão entrar).
+- `frontend/style.css` (partilhado, extraído dos 3 HTML).
+
+**Critérios de aceitação:**
+- Nenhum HTML mostra `contentHtml` sem `enrolled:true` vindo da API —
+  confiar sempre na resposta da API, nunca esconder só com CSS/JS no
+  cliente (isso não é segurança nenhuma, o backend já protege — o
+  frontend só precisa de respeitar o que a API devolve).
+- `priceKz` sempre formatado como Kwanza (ex: `50000` → `"50 000 Kz"`).
+- Erros da API (400/401/404/409) aparecem como mensagem legível na
+  página, nunca um alert cru de JSON.
+- Funciona abrindo os ficheiros num server estático simples (ex:
+  `npx serve frontend` ou `python -m http.server` dentro de `frontend/`)
+  com o backend a correr em paralelo em `localhost:5000`.
+
 ## Notas da revisão do sénior
 
 - **Auth:** corrigido um side-channel de tempo no login — quando o email

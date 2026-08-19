@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pt-AO">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Curso — Oaken Market</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <div class="container hflex">
+    <a class="logo" href="index.html">OAKEN <span>MARKET</span></a>
+    <div id="header-actions"></div>
+  </div>
+</header>
+
+<main>
+  <div class="container">
+    <div id="error-box" class="alert alert-error hidden"></div>
+    <div id="success-box" class="alert alert-success hidden"></div>
+    <div id="loading" class="loading-state">A carregar curso…</div>
+
+    <div id="course-content" class="hidden">
+      <div class="course-header">
+        <div class="top-row">
+          <div>
+            <h1 id="course-title"></h1>
+            <p id="course-description"></p>
+          </div>
+          <div class="buy-box" id="buy-box"></div>
+        </div>
+      </div>
+
+      <div id="modules-list"></div>
+    </div>
+  </div>
+</main>
+
+<script src="app.js"></script>
+<script>
+  renderHeader();
+
+  const params = new URLSearchParams(window.location.search);
+  const slug = params.get('slug');
+
+  const loading = document.getElementById('loading');
+  const errorBox = document.getElementById('error-box');
+  const successBox = document.getElementById('success-box');
+  const contentEl = document.getElementById('course-content');
+  const titleEl = document.getElementById('course-title');
+  const descEl = document.getElementById('course-description');
+  const buyBox = document.getElementById('buy-box');
+  const modulesList = document.getElementById('modules-list');
+
+  if (!slug) {
+    loading.classList.add('hidden');
+    showError(errorBox, new Error('Curso não especificado.'));
+  }
+
+  function renderModules(course, enrolled) {
+    modulesList.innerHTML = '';
+    course.modules.forEach((mod) => {
+      const modEl = document.createElement('div');
+      modEl.className = 'module';
+
+      const header = document.createElement('div');
+      header.className = 'module-title';
+      header.textContent = `Módulo ${mod.order} — ${mod.title}`;
+      modEl.appendChild(header);
+
+      mod.lessons.forEach((lesson) => {
+        const lessonEl = document.createElement('div');
+        lessonEl.className = 'lesson';
+
+        const hasContent = enrolled && lesson.contentHtml !== undefined;
+        const lockIcon = hasContent ? '' : '<span class="lock">&#128274;</span>';
+        const duration = lesson.durationMin
+          ? `<span class="lesson-duration">${lesson.durationMin} min</span>`
+          : '';
+
+        const titleRow = document.createElement('div');
+        titleRow.className = 'lesson-title';
+        titleRow.innerHTML = `${lockIcon} <span>${lesson.order}. ${lesson.title}</span> ${duration}`;
+        lessonEl.appendChild(titleRow);
+
+        if (hasContent) {
+          const contentEl2 = document.createElement('div');
+          contentEl2.className = 'lesson-content';
+          // contentHtml vem da API só quando enrolled:true — nunca é
+          // mostrado sem essa confirmação vinda do backend.
+          contentEl2.innerHTML = lesson.contentHtml;
+          lessonEl.appendChild(contentEl2);
+        }
+
+        modEl.appendChild(lessonEl);
+      });
+
+      modulesList.appendChild(modEl);
+    });
+  }
+
+  function renderBuyBox(course, enrolled) {
+    buyBox.innerHTML = '';
+
+    if (enrolled) {
+      const badge = document.createElement('span');
+      badge.className = 'enrolled-badge';
+      badge.textContent = 'Já tens acesso';
+      buyBox.appendChild(badge);
+      return;
+    }
+
+    const price = document.createElement('div');
+    price.className = 'price';
+    price.textContent = formatKz(course.priceKz);
+    buyBox.appendChild(price);
+
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-primary';
+    btn.textContent = 'Comprar';
+    btn.addEventListener('click', () => buyCourse(course, btn));
+    buyBox.appendChild(btn);
+  }
+
+  async function buyCourse(course, btn) {
+    clearError(errorBox);
+    successBox.classList.add('hidden');
+
+    if (!localStorage.getItem('token')) {
+      window.location.href = `login.html?next=curso.html?slug=${encodeURIComponent(slug)}`;
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'A processar…';
+
+    try {
+      const orderData = await apiFetch('/api/orders', {
+        method: 'POST',
+        body: JSON.stringify({ courseId: course.id, provider: 'manual' }),
+      });
+
+      const providerRef = orderData.order.providerRef;
+
+      // Só existe o provedor "manual" por agora — chamamos o webhook
+      // directamente para simular a confirmação de pagamento. Quando o
+      // provedor real entrar, este passo deixa de ser necessário aqui.
+      await apiFetch('/api/webhooks/manual', {
+        method: 'POST',
+        body: JSON.stringify({ providerRef }),
+      });
+
+      successBox.textContent = 'Compra confirmada! A carregar o conteúdo do curso…';
+      successBox.classList.remove('hidden');
+
+      await loadCourse();
+    } catch (err) {
+      showError(errorBox, err);
+      btn.disabled = false;
+      btn.textContent = 'Comprar';
+    }
+  }
+
+  async function loadCourse() {
+    try {
+      const data = await apiFetch(`/api/courses/${encodeURIComponent(slug)}`);
+      loading.classList.add('hidden');
+      contentEl.classList.remove('hidden');
+
+      const { course, enrolled } = data;
+      titleEl.textContent = course.title;
+      descEl.textContent = course.description || '';
+
+      renderBuyBox(course, enrolled);
+      renderModules(course, enrolled);
+    } catch (err) {
+      loading.classList.add('hidden');
+      showError(errorBox, err);
+    }
+  }
+
+  if (slug) {
+    loadCourse();
+  }
+</script>
+</body>
+</html>

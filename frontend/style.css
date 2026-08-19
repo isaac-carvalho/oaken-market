@@ -1,0 +1,363 @@
+/* style.css — partilhado por index.html, curso.html e login.html.
+   Paleta Oaken: navy #0B1F3A + laranja #FF6B00, Segoe UI. */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --primary: #0B1F3A;
+  --secondary: #FF6B00;
+  --accent: #00A3A1;
+  --light: #f0f4f8;
+  --gray: #64748B;
+  --green: #16a34a;
+  --red: #dc2626;
+}
+
+body {
+  font-family: 'Segoe UI', Roboto, system-ui, -apple-system, sans-serif;
+  background: #f8fafc;
+  color: var(--primary);
+  line-height: 1.6;
+  font-size: 16px;
+}
+
+a { text-decoration: none; color: inherit; }
+img { max-width: 100%; height: auto; display: block; }
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* ============ HEADER ============ */
+header {
+  background: var(--primary);
+  color: #fff;
+  padding: 14px 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, .25);
+}
+
+.hflex {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.logo {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.logo span { color: var(--secondary); }
+
+#header-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.header-user { font-size: 14px; opacity: .9; }
+
+/* ============ BUTTONS ============ */
+.btn {
+  display: inline-block;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 15px;
+  padding: 10px 22px;
+  border-radius: 30px;
+  transition: transform .15s, box-shadow .15s;
+}
+
+.btn:hover { transform: translateY(-2px); }
+
+.btn-primary {
+  background: var(--secondary);
+  color: #fff;
+  box-shadow: 0 6px 20px rgba(255, 107, 0, .35);
+}
+
+.btn-outline {
+  background: transparent;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, .5);
+}
+
+.btn-outline:hover { border-color: #fff; }
+
+.btn:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ============ MAIN / SECTIONS ============ */
+main { padding: 40px 0 70px; }
+
+.page-title {
+  font-size: clamp(24px, 4vw, 32px);
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.page-sub {
+  color: var(--gray);
+  margin-bottom: 30px;
+}
+
+/* ============ COURSE CARDS (index.html) ============ */
+.courses-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 24px;
+}
+
+.course-card {
+  background: #fff;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .06);
+  border-top: 4px solid var(--secondary);
+  display: flex;
+  flex-direction: column;
+}
+
+.course-card .cover {
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+  background: var(--light);
+}
+
+.course-card .cover-placeholder {
+  width: 100%;
+  height: 160px;
+  background: linear-gradient(135deg, var(--primary), #1a365d);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--secondary);
+  font-size: 40px;
+  font-weight: 800;
+}
+
+.course-card .body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 8px;
+}
+
+.course-card h3 { font-size: 18px; }
+
+.course-card p {
+  color: var(--gray);
+  font-size: 14px;
+  flex: 1;
+}
+
+.course-price {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+/* ============ CURSO DETALHE ============ */
+.course-header {
+  background: linear-gradient(135deg, var(--primary), #1a365d);
+  color: #fff;
+  border-radius: 20px;
+  padding: 34px 30px;
+  margin-bottom: 30px;
+}
+
+.course-header h1 { font-size: clamp(22px, 4vw, 30px); margin-bottom: 10px; }
+.course-header p { opacity: .85; max-width: 700px; }
+
+.course-header .top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.buy-box {
+  background: rgba(255, 255, 255, .07);
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 16px;
+  padding: 20px;
+  min-width: 220px;
+  text-align: center;
+}
+
+.buy-box .price {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--secondary);
+  margin-bottom: 12px;
+}
+
+.enrolled-badge {
+  display: inline-block;
+  background: rgba(22, 163, 74, .18);
+  color: #4ade80;
+  padding: 8px 18px;
+  border-radius: 30px;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.module {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .05);
+  margin-bottom: 18px;
+  overflow: hidden;
+}
+
+.module-title {
+  background: var(--light);
+  padding: 14px 20px;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.lesson {
+  padding: 14px 20px;
+  border-top: 1px solid var(--light);
+}
+
+.lesson-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.lesson-title .lock { color: var(--gray); }
+.lesson-duration { color: var(--gray); font-size: 13px; margin-left: auto; }
+
+.lesson-content {
+  margin-top: 10px;
+  color: var(--primary);
+  font-size: 15px;
+}
+
+/* ============ LOGIN / SIGNUP ============ */
+.auth-box {
+  max-width: 400px;
+  margin: 40px auto;
+  background: #fff;
+  border-radius: 18px;
+  padding: 34px 30px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .07);
+}
+
+.auth-box h1 {
+  font-size: 24px;
+  margin-bottom: 6px;
+  text-align: center;
+}
+
+.auth-sub {
+  text-align: center;
+  color: var(--gray);
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+.field { margin-bottom: 16px; }
+
+.field label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.field input {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 15px;
+  font-family: inherit;
+}
+
+.field input:focus {
+  outline: none;
+  border-color: var(--secondary);
+}
+
+.auth-box .btn-primary {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.auth-toggle {
+  text-align: center;
+  margin-top: 18px;
+  font-size: 14px;
+  color: var(--gray);
+}
+
+.auth-toggle button {
+  background: none;
+  border: none;
+  color: var(--secondary);
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+/* ============ ALERTS / MESSAGES ============ */
+.alert {
+  padding: 14px 18px;
+  border-radius: 10px;
+  margin-bottom: 18px;
+  font-size: 14px;
+}
+
+.alert-error {
+  background: rgba(220, 38, 38, .1);
+  color: var(--red);
+  border: 1px solid rgba(220, 38, 38, .25);
+}
+
+.alert-success {
+  background: rgba(22, 163, 74, .1);
+  color: var(--green);
+  border: 1px solid rgba(22, 163, 74, .25);
+}
+
+.hidden { display: none !important; }
+
+.empty-state {
+  text-align: center;
+  color: var(--gray);
+  padding: 60px 20px;
+}
+
+.loading-state {
+  text-align: center;
+  color: var(--gray);
+  padding: 40px 20px;
+}
+
+@media (max-width: 640px) {
+  .course-header .top-row { flex-direction: column; }
+  .buy-box { width: 100%; }
+}
