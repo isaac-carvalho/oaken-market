@@ -25,6 +25,7 @@ app.use('/api/auth', authLimiter, require('./routes/auth')(env));
 app.use('/api/courses', require('./routes/courses')(env));
 app.use('/api/orders', require('./routes/orders')(env));
 app.use('/api/webhooks', require('./routes/webhooks')(env));
+app.use('/api/admin', require('./routes/admin')(env));
 
 app.use(notFound);
 app.use(errorHandler);

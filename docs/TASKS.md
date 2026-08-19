@@ -75,7 +75,7 @@ um provedor específico dentro das rotas.
 
 ---
 
-## Tarefa 3 — Administração de conteúdo (`backend/src/routes/admin.js`)
+## Tarefa 3 — Administração de conteúdo (`backend/src/routes/admin.js`) ✅ concluída, revista pelo sénior
 
 Sem isto não há forma de a Oaken publicar um curso — falta a peça que
 liga o schema (Course/Module/Lesson) a alguém a escrever conteúdo.
