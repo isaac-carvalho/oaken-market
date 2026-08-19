@@ -200,6 +200,136 @@ WhatsApp") — nunca um número ou testemunho inventado.
 - `contentHtml` continua só visível quando a API devolve `enrolled:true`
   — o redesign não pode alterar essa lógica em `curso.html`.
 
+## Tarefa 6 — Tema escuro + acabamento premium na loja ✅ concluída, revista pelo sénior
+
+Objectivo: dar à loja (`frontend/`) um acabamento "premium" tipo SaaS
+moderno (referência que o dono mandou: Kursinha — fundo quase preto,
+cards com brilho/glow sutil, gradientes discretos), com alternância
+claro/escuro. Continua HTML/CSS/JS puro, sem framework. Não mexer na
+lógica de `app.js` além do necessário para o toggle de tema.
+
+**Sistema de tema:**
+- CSS custom properties em `:root` para todas as cores (já existem
+  algumas — auditar e garantir que TODA cor do `style.css` vem de uma
+  variável, nenhuma hardcoded).
+- `[data-theme="dark"]` no `<html>` redefine essas variáveis para a
+  paleta escura. Base escura: fundo quase preto (`#0a0a0f` / `#0d1117`
+  estilo), cards em cinza-azulado escuro com borda subtil
+  (`rgba(255,255,255,.08)`), texto quase branco. Mantém laranja `#FF6B00`
+  como accent em ambos os temas (é a cor da marca).
+- Botão de alternância no header (ícone lua/sol), salva a escolha em
+  `localStorage` (`theme`), aplica ao carregar a página em todas as 3
+  páginas (`index.html`, `curso.html`, `login.html`) antes do primeiro
+  paint se possível (evita "flash" de tema errado).
+- Adiciona a função `initTheme()` a `app.js` (chamada no topo de cada
+  página, antes de `renderHeader()`), e um `toggleTheme()` ligado ao
+  botão.
+
+**Acabamento premium (ambos os temas):**
+- Cards com sombra mais profunda + leve glow na borda ao hover (usar
+  `box-shadow` com a cor de accent a baixa opacidade).
+- Botões primários com gradiente sutil em vez de cor sólida chapada.
+- Micro-transições (`transition: all .2s ease`) em hovers/estados.
+- Tipografia com mais peso nos títulos (`font-weight:800`), espaçamento
+  generoso.
+
+**Critérios de aceitação:**
+- Toggle funciona nas 3 páginas, estado persiste ao navegar entre elas
+  (localStorage).
+- Nenhuma cor hardcoded fora das variáveis CSS (facilita manter os dois
+  temas sincronizados).
+- Tema escuro tem contraste legível (texto sobre fundo escuro, nunca
+  cinza-escuro sobre preto).
+- `apiFetch`, `formatKz`, `logout`, `renderHeader`, `showError`,
+  `clearError`, e a lógica de `enrolled`/`contentHtml` continuam
+  intactas — só adiciona `initTheme`/`toggleTheme`, não remove nada.
+
+## Tarefa 7 — Backend do painel de produtor: listar cursos (com rascunhos) e encomendas ✅ concluída, revista pelo sénior
+
+Sem isto o painel de produtor não tem dados reais para mostrar. Rotas
+novas, todas atrás de `requireAuth(env)` + `requireAdmin` (mesmo padrão
+de `admin.js`).
+
+- `GET /api/admin/courses` — lista TODOS os cursos do seller "oaken"
+  (publicados e rascunho, ao contrário de `GET /api/courses` que só
+  mostra publicados). Campos: id, slug, title, priceKz, published,
+  coverUrl, createdAt, e a contagem de `_count: { orders, enrollments }`
+  (usar `prisma.course.findMany({ include: { _count: { select: {
+  enrollments: true } } } })` — para "vendas aprovadas" por curso).
+- `GET /api/admin/orders` — lista encomendas do seller "oaken", mais
+  recentes primeiro. Cada item: id, createdAt, paidAt, status, amountKz,
+  provider, course (`{ title, slug }`), user (`{ name, email }`). Aceita
+  query params opcionais `status` (PENDING/PAID/FAILED/REFUNDED) e
+  `from`/`to` (datas ISO, filtra por `createdAt`).
+- `GET /api/admin/stats` — resumo para o dashboard: `{ approvedKz,
+  approvedCount, pendingKz, pendingCount, cancelledKz, cancelledCount,
+  avgTicketKz }`, calculado a partir de `Order` (PAID = aprovadas,
+  PENDING = pendentes, FAILED/REFUNDED = canceladas). Aceita os mesmos
+  `from`/`to` do endpoint acima.
+
+**Critérios de aceitação:**
+- `GET /api/admin/courses` mostra cursos rascunho (`published:false`) —
+  diferente da rota pública, que nunca mostra isso a quem não é ADMIN
+  (já implementado em `courses.js`, não mexer lá).
+- Nenhuma rota nova aceita filtro de `sellerId` do cliente — sempre fixo
+  no seller "oaken", igual ao resto de `admin.js`.
+- `avgTicketKz` calcula-se só sobre encomendas PAID (dividir soma por
+  contagem, nunca dividir por zero — devolver 0 se não houver nenhuma).
+- Datas inválidas em `from`/`to` devolvem 400, não rebentam 500.
+
+## Tarefa 8 — Painel de produtor: Dashboard, Produtos, Vendas ✅ concluída, revista pelo sénior
+
+Nova área em `frontend/admin/` (pasta separada da loja pública) — painel
+que só o dono usa para gerir os cursos. Referência visual: os
+screenshots do Kursinha que o dono mandou (sidebar fixa à esquerda com
+ícones, cards de estatística no topo, tabela de vendas com filtros).
+Reaproveita o sistema de tema claro/escuro e `apiFetch`/`formatKz`/etc.
+de `frontend/app.js` (copiar esse ficheiro para `frontend/admin/` ou
+apontar para ele via `<script src="../app.js">` — o que for mais simples
+sem duplicar lógica).
+
+Depende da Tarefa 7 — usa `GET /api/admin/courses`, `/orders`, `/stats`
+(lê a spec lá para os campos exactos). Se a Tarefa 7 ainda não estiver
+pronta quando começares, constrói contra o contrato descrito nela na
+mesma — os campos não vão mudar.
+
+**Páginas:**
+- `frontend/admin/index.html` — Dashboard: cards de estatística (vendas
+  aprovadas/pendentes/canceladas em Kz + contagem, ticket médio), vindos
+  de `GET /api/admin/stats`.
+- `frontend/admin/produtos.html` — lista de cursos (`GET
+  /api/admin/courses`), com badge "Publicado"/"Rascunho". Botão "Criar
+  curso" abre um modal (Nome=title, Preço=priceKz, Descrição=description,
+  URL da capa=coverUrl — sem upload de ficheiro, é só um campo de URL por
+  agora) que chama `POST /api/admin/courses`. Botão em cada curso pra
+  publicar/despublicar (`PATCH /api/admin/courses/:id` com
+  `{published: true/false}`).
+- `frontend/admin/vendas.html` — tabela de encomendas (`GET
+  /api/admin/orders`), colunas: data, curso, cliente, valor, status.
+  Filtro simples por status (dropdown: Todas/Aprovadas/Pendentes/
+  Canceladas) — filtra no cliente ou manda `?status=` para a API, como
+  preferires.
+- Sidebar fixa comum às 3 páginas: Dashboard, Produtos, Vendas (as 3
+  reais) + Afiliados, Financeiro, Integrações, Ranking **marcados "Em
+  breve"** (visíveis mas sem link/desabilitados, com badge) — essas
+  quatro precisam de sistemas que ainda não existem (carteira/saque,
+  afiliados, webhooks, gamificação) e não vão ser inventadas com dados
+  falsos. Login simples: reaproveita `login.html` da loja, mas só deixa
+  entrar no painel quem é ADMIN (checar `user.role` guardado no
+  localStorage; se não for ADMIN, mostra mensagem e não entra).
+
+**Regra de honestidade (igual à Tarefa 5):** nada de números de vendas
+inventados, saldo fictício, ou afiliados fantasma nas páginas "Em breve"
+— são só placeholders visuais dizendo que a funcionalidade ainda não
+existe.
+
+**Critérios de aceitação:**
+- As 3 páginas reais mostram dados reais da API, nunca mockados.
+- Páginas "Em breve" claramente marcadas como tal, sem fingir ter dados.
+- Só ADMIN acede ao painel — BUYER é bloqueado com mensagem clara.
+- Reaproveita `apiFetch`/`formatKz`/tema de `app.js`, não duplica essa
+  lógica.
+
 ## Notas da revisão do sénior
 
 - **Auth:** corrigido um side-channel de tempo no login — quando o email

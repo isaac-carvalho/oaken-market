@@ -43,10 +43,48 @@ async function apiFetch(path, opts = {}) {
   return data;
 }
 
-/** Formata um valor em Kwanza: 50000 -> "50 000 Kz" */
+/**
+ * Aplica o tema guardado em localStorage (`theme`: "light" | "dark") ao
+ * elemento <html>, e sincroniza o ícone do botão de alternância (se
+ * existir na página). Chamar no topo de cada página, antes de
+ * renderHeader() — o <head> de cada HTML já aplica o tema mais cedo
+ * (antes do CSS carregar) para evitar flash; esta chamada garante
+ * consistência e liga o ícone do botão.
+ */
+function initTheme() {
+  const saved = localStorage.getItem('theme');
+  const theme = saved === 'dark' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', theme);
+  updateThemeToggleIcon(theme);
+}
+
+/** Alterna entre tema claro e escuro, e guarda a escolha em localStorage. */
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+  updateThemeToggleIcon(next);
+}
+
+/** Actualiza o ícone do botão de alternância de tema, se existir na página. */
+function updateThemeToggleIcon(theme) {
+  const btn = document.getElementById('theme-toggle-btn');
+  if (!btn) return;
+  btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+  btn.setAttribute('aria-label', theme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro');
+}
+
+/**
+ * Formata um valor em Kwanza: 50000 -> "50 000 Kz". Agrupa os milhares à
+ * mão em vez de usar toLocaleString('pt-PT') — o suporte de dados ICU
+ * para agrupamento varia por navegador/SO e alguns nem sempre inserem o
+ * separador (ex: 5000 saía "5000" em vez de "5 000" nalguns motores).
+ */
 function formatKz(n) {
-  const num = Number(n) || 0;
-  return `${num.toLocaleString('pt-PT').replace(/,/g, ' ')} Kz`;
+  const num = Math.round(Number(n) || 0);
+  const grouped = Math.abs(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return `${num < 0 ? '-' : ''}${grouped} Kz`;
 }
 
 /** Remove sessão do localStorage e volta para a página de login. */

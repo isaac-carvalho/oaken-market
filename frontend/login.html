@@ -4,6 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Entrar — Oaken Market</title>
+<script>
+  // Aplica o tema guardado antes do primeiro paint, para evitar "flash"
+  // do tema errado enquanto o resto do JS carrega.
+  (function () {
+    if (localStorage.getItem('theme') === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  })();
+</script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -11,7 +20,10 @@
 <header>
   <div class="container hflex">
     <a class="logo" href="index.html">OAKEN <span>MARKET</span></a>
-    <div id="header-actions"></div>
+    <div class="header-right">
+      <button type="button" id="theme-toggle-btn" class="theme-toggle" onclick="toggleTheme()" aria-label="Mudar tema">🌙</button>
+      <div id="header-actions"></div>
+    </div>
   </div>
 </header>
 
@@ -49,6 +61,7 @@
 
 <script src="app.js"></script>
 <script>
+  initTheme();
   renderHeader();
 
   const nextUrl = new URLSearchParams(window.location.search).get('next') || 'index.html';

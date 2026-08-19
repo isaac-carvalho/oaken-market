@@ -24,6 +24,13 @@ enum OrderStatus {
   REFUNDED
 }
 
+enum CourseType {
+  DIGITAL
+  PHYSICAL
+  SERVICE
+  PAYMENT
+}
+
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
@@ -54,6 +61,8 @@ model Course {
   description String
   priceKz     Int
   coverUrl    String?
+  category    String?
+  type        CourseType @default(DIGITAL)
   published   Boolean  @default(false)
   createdAt   DateTime @default(now())
 

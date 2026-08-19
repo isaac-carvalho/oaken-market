@@ -7,6 +7,8 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 
 const SELLER_SLUG = 'oaken';
 
+const COURSE_TYPES = ['DIGITAL', 'PHYSICAL', 'SERVICE', 'PAYMENT'];
+
 const createCourseSchema = z.object({
   slug: z
     .string()
@@ -15,6 +17,8 @@ const createCourseSchema = z.object({
   description: z.string().trim().min(1, 'description em falta'),
   priceKz: z.number().int('priceKz tem de ser inteiro').positive('priceKz tem de ser positivo'),
   coverUrl: z.string().url('coverUrl inválido').optional(),
+  category: z.string().trim().min(1).optional(),
+  type: z.enum(COURSE_TYPES).optional(),
 });
 
 const updateCourseSchema = z
@@ -23,6 +27,8 @@ const updateCourseSchema = z
     description: z.string().trim().min(1).optional(),
     priceKz: z.number().int('priceKz tem de ser inteiro').positive('priceKz tem de ser positivo').optional(),
     coverUrl: z.string().url('coverUrl inválido').optional(),
+    category: z.string().trim().min(1).optional(),
+    type: z.enum(COURSE_TYPES).optional(),
     published: z.boolean().optional(),
   })
   .strict();
@@ -47,6 +53,40 @@ const updateLessonSchema = z
   })
   .strict();
 
+const ORDER_STATUSES = ['PENDING', 'PAID', 'FAILED', 'REFUNDED'];
+
+const listOrdersQuerySchema = z
+  .object({
+    status: z.enum(ORDER_STATUSES).optional(),
+    from: z.string().trim().min(1).optional(),
+    to: z.string().trim().min(1).optional(),
+  })
+  .strict();
+
+const statsQuerySchema = z
+  .object({
+    from: z.string().trim().min(1).optional(),
+    to: z.string().trim().min(1).optional(),
+  })
+  .strict();
+
+// Datas inválidas em `from`/`to` têm de dar 400, não rebentar 500 lá em
+// baixo quando o Prisma recebe um Date inválido.
+function parseDateParam(value, label) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new HttpError(400, `${label} inválido`);
+  }
+  return date;
+}
+
+function buildCreatedAtFilter(from, to) {
+  const filter = {};
+  if (from) filter.gte = parseDateParam(from, 'from');
+  if (to) filter.lte = parseDateParam(to, 'to');
+  return filter;
+}
+
 // Prisma P2002 (unique constraint) devolve 409 com mensagem clara, em vez
 // de rebentar como 500 — usado nos conflitos de `order` únicos por curso/módulo.
 function isUniqueConstraintError(err) {
@@ -64,7 +104,7 @@ module.exports = function (env) {
       if (!parsed.success) {
         return next(new HttpError(400, parsed.error.issues[0]?.message || 'Dados inválidos'));
       }
-      const { slug, title, description, priceKz, coverUrl } = parsed.data;
+      const { slug, title, description, priceKz, coverUrl, category, type } = parsed.data;
 
       // sellerId nunca vem do body — vai sempre buscar o seller fixo "oaken".
       const seller = await prisma.seller.findUniqueOrThrow({ where: { slug: SELLER_SLUG } });
@@ -77,6 +117,8 @@ module.exports = function (env) {
           description,
           priceKz,
           coverUrl,
+          category,
+          type,
           published: false,
         },
       });
@@ -188,6 +230,134 @@ module.exports = function (env) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
         return next(new HttpError(404, 'Aula não encontrada'));
       }
+      next(err);
+    }
+  });
+
+  // Lista TODOS os cursos do seller "oaken", incluindo rascunhos — ao
+  // contrário de GET /api/courses (rota pública), que só mostra publicados.
+  router.get('/courses', async (req, res, next) => {
+    try {
+      const seller = await prisma.seller.findUniqueOrThrow({ where: { slug: SELLER_SLUG } });
+
+      const courses = await prisma.course.findMany({
+        where: { sellerId: seller.id },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          priceKz: true,
+          published: true,
+          coverUrl: true,
+          category: true,
+          type: true,
+          createdAt: true,
+          _count: { select: { orders: true, enrollments: true } },
+        },
+      });
+
+      res.json({ courses });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.get('/orders', async (req, res, next) => {
+    try {
+      const parsed = listOrdersQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        return next(new HttpError(400, parsed.error.issues[0]?.message || 'Parâmetros inválidos'));
+      }
+      const { status, from, to } = parsed.data;
+      const createdAtFilter = buildCreatedAtFilter(from, to);
+
+      // sellerId nunca vem do cliente — fixo no seller "oaken", via
+      // relação course.sellerId (Order não guarda sellerId directamente).
+      const seller = await prisma.seller.findUniqueOrThrow({ where: { slug: SELLER_SLUG } });
+
+      const orders = await prisma.order.findMany({
+        where: {
+          course: { sellerId: seller.id },
+          ...(status ? { status } : {}),
+          ...(Object.keys(createdAtFilter).length ? { createdAt: createdAtFilter } : {}),
+        },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          createdAt: true,
+          paidAt: true,
+          status: true,
+          amountKz: true,
+          provider: true,
+          course: { select: { title: true, slug: true } },
+          user: { select: { name: true, email: true } },
+        },
+      });
+
+      res.json({ orders });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.get('/stats', async (req, res, next) => {
+    try {
+      const parsed = statsQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        return next(new HttpError(400, parsed.error.issues[0]?.message || 'Parâmetros inválidos'));
+      }
+      const { from, to } = parsed.data;
+      const createdAtFilter = buildCreatedAtFilter(from, to);
+
+      const seller = await prisma.seller.findUniqueOrThrow({ where: { slug: SELLER_SLUG } });
+
+      const grouped = await prisma.order.groupBy({
+        by: ['status'],
+        where: {
+          course: { sellerId: seller.id },
+          ...(Object.keys(createdAtFilter).length ? { createdAt: createdAtFilter } : {}),
+        },
+        _sum: { amountKz: true },
+        _count: { _all: true },
+      });
+
+      let approvedKz = 0;
+      let approvedCount = 0;
+      let pendingKz = 0;
+      let pendingCount = 0;
+      let cancelledKz = 0;
+      let cancelledCount = 0;
+
+      for (const group of grouped) {
+        const kz = group._sum.amountKz || 0;
+        const count = group._count._all;
+        if (group.status === 'PAID') {
+          approvedKz = kz;
+          approvedCount = count;
+        } else if (group.status === 'PENDING') {
+          pendingKz = kz;
+          pendingCount = count;
+        } else {
+          // FAILED e REFUNDED contam ambos como "canceladas".
+          cancelledKz += kz;
+          cancelledCount += count;
+        }
+      }
+
+      // Nunca dividir por zero — sem encomendas PAID, o ticket médio é 0.
+      const avgTicketKz = approvedCount > 0 ? Math.round(approvedKz / approvedCount) : 0;
+
+      res.json({
+        approvedKz,
+        approvedCount,
+        pendingKz,
+        pendingCount,
+        cancelledKz,
+        cancelledCount,
+        avgTicketKz,
+      });
+    } catch (err) {
       next(err);
     }
   });
