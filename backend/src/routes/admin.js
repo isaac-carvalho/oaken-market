@@ -546,6 +546,108 @@ module.exports = function (env) {
     }
   });
 
+  // Ranking de cursos por faturamento (soma de amountKz de Order PAID),
+  // decrescente. Cursos sem nenhuma venda aparecem no fim com zero — nunca
+  // escondidos, é informação real de "ainda não vendeu nada".
+  router.get('/ranking/courses', async (req, res, next) => {
+    try {
+      const seller = await prisma.seller.findUniqueOrThrow({ where: { slug: SELLER_SLUG } });
+
+      const courses = await prisma.course.findMany({
+        where: { sellerId: seller.id },
+        select: { id: true, title: true, slug: true },
+      });
+
+      const grouped = await prisma.order.groupBy({
+        by: ['courseId'],
+        where: {
+          course: { sellerId: seller.id },
+          status: 'PAID',
+        },
+        _sum: { amountKz: true },
+        _count: { _all: true },
+      });
+
+      const salesByCourseId = new Map(
+        grouped.map((g) => [g.courseId, { salesKz: g._sum.amountKz || 0, salesCount: g._count._all }])
+      );
+
+      const ranking = courses
+        .map((course) => {
+          const sales = salesByCourseId.get(course.id) || { salesKz: 0, salesCount: 0 };
+          return {
+            courseId: course.id,
+            title: course.title,
+            slug: course.slug,
+            salesKz: sales.salesKz,
+            salesCount: sales.salesCount,
+          };
+        })
+        .sort((a, b) => b.salesKz - a.salesKz);
+
+      res.json({ ranking });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // Ranking de afiliados aprovados por comissão gerada (soma de
+  // commissionKz de Order PAID ligadas a cada Affiliate), decrescente.
+  // Afiliados aprovados sem vendas ainda aparecem com zero.
+  router.get('/ranking/affiliates', async (req, res, next) => {
+    try {
+      const seller = await prisma.seller.findUniqueOrThrow({ where: { slug: SELLER_SLUG } });
+
+      const affiliates = await prisma.affiliate.findMany({
+        where: {
+          course: { sellerId: seller.id },
+          status: 'APPROVED',
+        },
+        select: {
+          id: true,
+          user: { select: { name: true, email: true } },
+          course: { select: { title: true } },
+        },
+      });
+
+      const affiliateIds = affiliates.map((a) => a.id);
+
+      const grouped = affiliateIds.length
+        ? await prisma.order.groupBy({
+            by: ['affiliateId'],
+            where: {
+              affiliateId: { in: affiliateIds },
+              status: 'PAID',
+            },
+            _sum: { commissionKz: true },
+            _count: { _all: true },
+          })
+        : [];
+
+      const commissionByAffiliateId = new Map(
+        grouped.map((g) => [g.affiliateId, { commissionKz: g._sum.commissionKz || 0, salesCount: g._count._all }])
+      );
+
+      const ranking = affiliates
+        .map((affiliate) => {
+          const commission = commissionByAffiliateId.get(affiliate.id) || { commissionKz: 0, salesCount: 0 };
+          return {
+            affiliateId: affiliate.id,
+            userName: affiliate.user.name,
+            userEmail: affiliate.user.email,
+            courseTitle: affiliate.course.title,
+            commissionKz: commission.commissionKz,
+            salesCount: commission.salesCount,
+          };
+        })
+        .sort((a, b) => b.commissionKz - a.commissionKz);
+
+      res.json({ ranking });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   router.delete('/webhooks/:id', async (req, res, next) => {
     try {
       await prisma.webhookEndpoint.delete({ where: { id: req.params.id } });

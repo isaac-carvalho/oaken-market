@@ -600,6 +600,35 @@ nesta fase) nem inventar um.
 - Reaproveita `apiFetch`/`formatKz`/`initAdminPage` — não duplica nada.
 - `node --check` limpo.
 
+## Tarefa 15 — Backend de Ranking (cursos e afiliados, dados reais) ✅ concluída, revista pelo sénior
+
+Diferente de propósito do "Ranking de Produtores"/"Jornada Planetária"
+do Kursinha (decisão do dono: não copiar essa parte, é gamificação com
+níveis e recompensas fantasiosas). Aqui é simples: dois rankings de
+desempenho real, sem inventar nada — nem níveis, nem badges, nem
+percentagens de progresso para uma meta que ninguém definiu.
+
+**`GET /api/admin/ranking/courses`** (adicionar a `admin.js`, mesmo
+padrão): cursos do seller "oaken" ordenados por faturamento (soma de
+`amountKz` de `Order` com `status: PAID`), decrescente. Cada item:
+`{ courseId, title, slug, salesKz, salesCount }`. Cursos sem nenhuma
+venda aparecem no fim com `salesKz: 0, salesCount: 0` (não esconder —
+é informação real de "ainda não vendeu nada").
+
+**`GET /api/admin/ranking/affiliates`**: afiliados com `status:
+APPROVED` ordenados por comissão gerada (soma de `commissionKz` das
+`Order` ligadas a cada `Affiliate` com `status: PAID`), decrescente.
+Cada item: `{ affiliateId, userName, userEmail, courseTitle,
+commissionKz, salesCount }`. Afiliados aprovados sem vendas ainda
+aparecem com `commissionKz: 0` (mesma regra de honestidade).
+
+**Critérios de aceitação:**
+- Nenhum dos dois rankings inclui dados de outro seller (sempre
+  filtrado por `course.sellerId` = seller "oaken").
+- Cursos/afiliados sem vendas aparecem com zero, nunca escondidos nem
+  com um valor inventado.
+- `node --check` limpo.
+
 ## Notas da revisão do sénior
 
 - **Auth:** corrigido um side-channel de tempo no login — quando o email
