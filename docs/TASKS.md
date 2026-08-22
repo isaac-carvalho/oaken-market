@@ -660,6 +660,43 @@ percentagens de progresso para uma meta, ou qualquer estética de jogo.
 - Reaproveita `apiFetch`/`formatKz`/`initAdminPage` — não duplica nada.
 - `node --check` limpo.
 
+## Tarefa 17 — Backend "Explorar": vitrine pública de cursos para afiliação ✅ concluída, revista pelo sénior (inclui `temperatureDegrees` = 30 + recentSalesCount×20, fórmula documentada no código)
+
+Referência: página "Explorar" do Kursinha (vitrine de produtos para
+quem quer ser afiliado, com indicador de "temperatura" de vendas e
+comissão possível por venda). Fazemos a mesma ideia, mas a
+"temperatura" é sempre um número real (vendas recentes), nunca um grau
+inventado tipo "150°" sem fórmula por trás.
+
+**`GET /api/affiliates/explore`** — rota pública (SEM `requireAuth`,
+tem de ficar definida ANTES do `router.use(requireAuth(env))` em
+`affiliates.js`, ou num router separado montado antes desse
+middleware — qualquer visitante deve poder ver a vitrine antes de
+criar conta). Lista todos os cursos publicados do seller "oaken",
+ordenados por vendas recentes (mais vendido primeiro):
+
+```
+{ courses: [{
+  id, slug, title, coverUrl, priceKz,
+  commissionPct,        // 30, tem de bater com o default do schema (Affiliate.commissionPct)
+  maxCommissionKz,       // round(priceKz * commissionPct / 100)
+  recentSalesCount,      // contagem de Order PAID deste curso com createdAt >= agora-30 dias
+}] }
+```
+
+`recentSalesCount` calculado com `prisma.order.groupBy` (mesmo padrão
+já usado em `/stats`/`/ranking/courses` noutros ficheiros deste
+projecto), filtrado por `createdAt: { gte: <há 30 dias> }` e
+`status: 'PAID'`. Cursos sem vendas recentes aparecem com
+`recentSalesCount: 0` (nunca escondidos).
+
+**Critérios de aceitação:**
+- Rota acessível sem token (visitante anónimo consegue ver a vitrine).
+- `recentSalesCount` é sempre uma contagem real recalculada, nunca um
+  número fixo ou fórmula inventada.
+- Só cursos `published: true` do seller "oaken" aparecem.
+- `node --check` limpo.
+
 ## Notas da revisão do sénior
 
 - **Auth:** corrigido um side-channel de tempo no login — quando o email
