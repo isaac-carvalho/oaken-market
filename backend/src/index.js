@@ -10,7 +10,7 @@ const env = loadEnv();
 
 const app = express();
 app.use(helmet());
-app.use(cors({ origin: env.allowedOrigin }));
+app.use(cors({ origin: env.allowedOrigins }));
 app.use(express.json());
 
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });

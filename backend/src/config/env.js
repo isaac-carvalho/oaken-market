@@ -16,7 +16,9 @@ function loadEnv() {
     nodeEnv: process.env.NODE_ENV || 'development',
     databaseUrl: process.env.DATABASE_URL,
     jwtSecret: process.env.JWT_SECRET,
-    allowedOrigin: process.env.ALLOWED_ORIGIN,
+    // ALLOWED_ORIGIN aceita uma lista separada por vírgulas (ex: para
+    // servir mais do que uma loja/frontend a partir deste mesmo backend).
+    allowedOrigins: process.env.ALLOWED_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean),
   };
 }
 
