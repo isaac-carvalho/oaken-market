@@ -111,6 +111,16 @@ function parseDateParam(value, label) {
   return date;
 }
 
+// `to` chega muitas vezes como data pura ("2026-08-19"), que o Date
+// interpreta como meia-noite UTC desse dia — se usássemos isso directamente
+// como limite superior, uma venda feita às 16h desse mesmo dia ficaria de
+// fora (e o dia aparecia com zero, apesar de ter uma venda real). Esta
+// função alarga sempre `to` até ao fim desse dia em UTC, para o filtro
+// cobrir o dia inteiro independentemente da hora que o chamador enviou.
+function endOfUtcDay(date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59, 999));
+}
+
 function buildCreatedAtFilter(from, to) {
   const filter = {};
   if (from) filter.gte = parseDateParam(from, 'from');
@@ -419,7 +429,7 @@ module.exports = function (env) {
         where: {
           course: { sellerId: seller.id },
           status: 'PAID',
-          paidAt: { gte: fromDate, lte: toDate },
+          paidAt: { gte: fromDate, lte: endOfUtcDay(toDate) },
         },
         select: { paidAt: true, amountKz: true },
       });
@@ -476,7 +486,7 @@ module.exports = function (env) {
         where: {
           course: { sellerId: seller.id },
           status: 'PAID',
-          paidAt: { gte: fromDate, lte: toDate },
+          paidAt: { gte: fromDate, lte: endOfUtcDay(toDate) },
         },
         select: { paidAt: true, amountKz: true },
       });
@@ -521,7 +531,7 @@ module.exports = function (env) {
         where: {
           course: { sellerId: seller.id },
           status: 'PAID',
-          paidAt: { gte: fromDate, lte: toDate },
+          paidAt: { gte: fromDate, lte: endOfUtcDay(toDate) },
         },
         _sum: { amountKz: true },
         _count: { _all: true },

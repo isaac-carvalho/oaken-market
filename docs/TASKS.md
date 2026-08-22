@@ -729,7 +729,7 @@ todos, logados ou não).
   `app.js` — não duplica nada.
 - `node --check` limpo.
 
-## Tarefa 19 — Backend do Dashboard: série diária, por hora e por método
+## Tarefa 19 — Backend do Dashboard: série diária, por hora e por método ✅ concluída, revista pelo sénior
 
 Referência: Dashboard do Kursinha tem "Faturamento diário" (gráfico por
 dia no período), "Vendas por hora" (distribuição 00h-23h) e "Vendas por
@@ -823,6 +823,20 @@ Em `frontend/explorar.html`:
   `userId` (payload do JWT em `auth.js` é `{ sub: user.id, role }`).
 - Confirmando a outra dúvida: 404 (não 403) em curso não publicado está
   correto — não revelar a um estranho que um slug existe é a escolha certa.
+- **Tarefa 19 (stats/daily, stats/hourly, stats/by-provider):** encontrado
+  e corrigido um bug real testando ao vivo contra a BD de produção — quando
+  `to` chega como data pura (ex: `"2026-08-19"`, sem hora), o `Date`
+  interpreta isso como meia-noite UTC desse dia, e o filtro `lte: toDate`
+  cortava fora qualquer venda feita mais tarde nesse mesmo dia. Resultado:
+  uma venda real de 299 000 Kz aparecia como zero no dia correcto — um
+  "zero falso", pior do que simplesmente esconder um zero real. Corrigido
+  com `endOfUtcDay(toDate)`, que alarga sempre o limite superior até ao
+  fim desse dia em UTC antes de consultar a BD, independentemente da hora
+  que o chamador enviou. Reproduzido e confirmado corrigido com a venda
+  real existente (offshore, 299 000 Kz, `manual`, `paidAt` 16:58 UTC) nas
+  três rotas, mais intervalo de 5 dias sem vendas (5 dias a zero, nenhum
+  omitido) e validação de datas inválidas/`from > to`/parâmetros em falta
+  (400 em todos os casos).
 
 ### Backlog não-bloqueante (não impede seguir para o resto do MVP)
 
