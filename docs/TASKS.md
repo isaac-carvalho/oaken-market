@@ -660,7 +660,7 @@ percentagens de progresso para uma meta, ou qualquer estética de jogo.
 - Reaproveita `apiFetch`/`formatKz`/`initAdminPage` — não duplica nada.
 - `node --check` limpo.
 
-## Tarefa 17 — Backend "Explorar": vitrine pública de cursos para afiliação ✅ concluída, revista pelo sénior (inclui `temperatureDegrees` = 30 + recentSalesCount×20, fórmula documentada no código)
+## Tarefa 17 — Backend "Explorar": vitrine pública de cursos para afiliação ✅ concluída, revista pelo sénior (+ campo category adicionado depois) (inclui `temperatureDegrees` = 30 + recentSalesCount×20, fórmula documentada no código)
 
 Referência: página "Explorar" do Kursinha (vitrine de produtos para
 quem quer ser afiliado, com indicador de "temperatura" de vendas e
@@ -695,6 +695,117 @@ projecto), filtrado por `createdAt: { gte: <há 30 dias> }` e
 - `recentSalesCount` é sempre uma contagem real recalculada, nunca um
   número fixo ou fórmula inventada.
 - Só cursos `published: true` do seller "oaken" aparecem.
+- `node --check` limpo.
+
+## Tarefa 18 — Frontend "Explorar" (vitrine de afiliação na loja) ✅ concluída, revista pelo sénior
+
+Backend pronto (Tarefa 17): `GET /api/affiliates/explore` (pública),
+devolve por curso: `id, slug, title, coverUrl, priceKz, commissionPct,
+maxCommissionKz, recentSalesCount, temperatureDegrees`.
+
+Página nova `frontend/explorar.html` — parte da LOJA pública (não do
+painel admin), mesmo header/footer/tema de `index.html`/`curso.html`.
+Link "Explorar" no header (`#header-actions` ou ao lado, visível a
+todos, logados ou não).
+
+- Grid de cards, um por curso: capa, título, preço, **"🌡️ X°"**
+  (`temperatureDegrees`) e por baixo, em texto pequeno, o número real
+  ("X vendas nos últimos 30 dias") — o grau nunca aparece sozinho sem
+  o número real por perto. "Ganha até `maxCommissionKz` por venda"
+  (`formatKz`).
+- Botão "Tornar-me afiliado" em cada card: se não há sessão, redirecciona
+  para `login.html?next=explorar.html`; se há sessão, `POST
+  /api/affiliates {courseId}` (mesma chamada já usada em `curso.html`)
+  e o botão muda para "Pedido enviado" (desactivado) — não precisa de
+  saber o estado exacto aqui (isso já existe na página do curso), só
+  dar feedback imediato do clique.
+
+**Critérios de aceitação:**
+- `temperatureDegrees` nunca aparece sem o número real de vendas ao
+  lado, na mesma vista.
+- Cursos com 0 vendas recentes aparecem na grelha na mesma (não
+  escondidos por teren nota baixa).
+- Reaproveita `apiFetch`/`formatKz`/`initTheme`/`renderHeader` de
+  `app.js` — não duplica nada.
+- `node --check` limpo.
+
+## Tarefa 19 — Backend do Dashboard: série diária, por hora e por método
+
+Referência: Dashboard do Kursinha tem "Faturamento diário" (gráfico por
+dia no período), "Vendas por hora" (distribuição 00h-23h) e "Vendas por
+método" (REF/EXPRESS/MANUAL — no nosso caso, o `provider` da `Order`).
+Importante: estes gráficos têm de aparecer **mesmo com zero vendas** —
+todos os dias/horas do período aparecem no array, com zero quando não
+houver, nunca omitidos (é assim que o Kursinha mostra "0,1,2,3,4" no
+eixo com a linha achatada em zero).
+
+Adicionar a `admin.js`, mesmo padrão de sempre (seller fixo "oaken",
+`requireAuth`+`requireAdmin` já aplicados no `router.use` do topo):
+
+**`GET /api/admin/stats/daily?from=&to=`** — obrigatório `from`/`to`
+(ISO). Devolve `{ days: [{ date: 'YYYY-MM-DD', salesKz, salesCount }] }`
+com **uma entrada para cada dia do intervalo**, incluindo os dias sem
+nenhuma `Order` PAID (zero). Implementação sugerida: buscar todas as
+`Order` PAID do seller "oaken" no intervalo com `findMany` (dataset
+pequeno nesta fase, não precisa de SQL agregado), agrupar por dia em
+JS, e depois preencher os dias em falta com zero — nunca saltar um dia.
+
+**`GET /api/admin/stats/hourly?from=&to=`** — mesmo intervalo
+obrigatório. Devolve `{ hours: [{ hour: 0..23, salesKz, salesCount }] }`
+— sempre as 24 entradas (0 a 23), agregando `Order` PAID do intervalo
+pela hora local de `paidAt` (usar hora UTC é aceitável, documentar no
+código qual se está a usar).
+
+**`GET /api/admin/stats/by-provider?from=&to=`** — devolve `{
+providers: [{ provider, salesKz, salesCount, pct }] }`, `pct` =
+percentagem do `salesKz` desse provider sobre o total do período
+(0 se o total for zero — nunca dividir por zero). Incluir todos os
+providers que já tiveram alguma `Order` (mesmo fora do período? não —
+só os que aparecem no período; se o período não tem nenhuma venda,
+devolver `providers: []`, a página trata isso como "sem dados").
+
+**Critérios de aceitação:**
+- `stats/daily` e `stats/hourly` nunca omitem um dia/hora do intervalo
+  pedido — testar mentalmente com um intervalo de 5 dias sem nenhuma
+  venda: tem de devolver 5 entradas, todas a zero.
+- `stats/by-provider` nunca divide por zero.
+- `from`/`to` inválidos ou em falta devolvem 400 (reaproveitar
+  `parseDateParam` já existente no ficheiro).
+- `node --check` limpo.
+
+## Tarefa 20 — Explorar: busca, filtro de categoria, ordenação e "Página do afiliado" ✅ concluída, revista pelo sénior
+
+Referência: o dono mandou print real da vitrine do Kursinha (busca +
+categorias + ordenar por + cards com "Página do afiliado"). Backend já
+devolve `category` em cada curso (`GET /api/affiliates/explore`,
+acabei de acrescentar). NÃO incluir "Order bump" — é uma funcionalidade
+de cross-sell no checkout que não existe na plataforma, não vamos pôr
+um link que não faz nada (isso seria enganar o utilizador).
+
+Em `frontend/explorar.html`:
+- Campo de busca (texto livre, filtra por `title` no cliente — não
+  precisa de round-trip à API, os dados já vêm todos de uma vez).
+- Dropdown "Categorias": "Todas as categorias" + lista das categorias
+  realmente presentes nos cursos devolvidos (`[...new Set(courses.map(c
+  => c.category).filter(Boolean))]`) — nunca uma lista fixa que pode
+  não bater com os dados reais.
+- Dropdown "Ordenar por": "Mais quentes" (`temperatureDegrees` desc,
+  já é a ordem que a API devolve — é a opção por omissão), "Maior
+  comissão" (`maxCommissionKz` desc), "Menor preço" (`priceKz` asc).
+  Tudo reordenado no cliente, já têm os dados todos.
+- Cada card ganha um link "🔗 Página do afiliado" que aponta para
+  `curso.html?slug=<slug>` (pré-visualização da página de vendas do
+  curso — antes de a afiliação ser aprovada ainda não há `ref` para
+  colocar, é só a antevisão da página que vai promover).
+- Busca/categoria/ordenação combinam-se (filtrar por busca E categoria,
+  depois ordenar) — recalcular a grid a cada mudança, sem re-pedir a
+  API.
+
+**Critérios de aceitação:**
+- Filtro de categoria só mostra categorias que existem mesmo nos dados
+  devolvidos — nunca uma lista inventada/fixa.
+- As 3 opções de ordenação funcionam e são recalculadas no cliente.
+- Nenhum "Order bump" nem qualquer link que não leve a lado nenhum.
 - `node --check` limpo.
 
 ## Notas da revisão do sénior

@@ -51,6 +51,7 @@ module.exports = function (env) {
           title: true,
           coverUrl: true,
           priceKz: true,
+          category: true,
         },
       });
 
@@ -79,6 +80,7 @@ module.exports = function (env) {
             title: course.title,
             coverUrl: course.coverUrl,
             priceKz: course.priceKz,
+            category: course.category,
             commissionPct: DEFAULT_COMMISSION_PCT,
             maxCommissionKz: Math.round((course.priceKz * DEFAULT_COMMISSION_PCT) / 100),
             recentSalesCount,

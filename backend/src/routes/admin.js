@@ -91,6 +91,16 @@ const statsQuerySchema = z
   })
   .strict();
 
+// Ao contrário de statsQuerySchema (from/to opcionais), estas três rotas de
+// série temporal exigem sempre from/to — sem intervalo não há como saber
+// que dias/horas preencher com zero.
+const seriesStatsQuerySchema = z
+  .object({
+    from: z.string().trim().min(1, 'from em falta'),
+    to: z.string().trim().min(1, 'to em falta'),
+  })
+  .strict();
+
 // Datas inválidas em `from`/`to` têm de dar 400, não rebentar 500 lá em
 // baixo quando o Prisma recebe um Date inválido.
 function parseDateParam(value, label) {
@@ -378,6 +388,160 @@ module.exports = function (env) {
         cancelledCount,
         avgTicketKz,
       });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // Série diária de faturamento (Order PAID, por dia de `paidAt`, em UTC).
+  // from/to são obrigatórios: sem intervalo não há dias para preencher.
+  // O array `days` tem SEMPRE uma entrada por cada dia do intervalo,
+  // incluindo dias sem nenhuma venda (zero) — nunca omitido, para o
+  // gráfico do dashboard não "saltar" dias.
+  router.get('/stats/daily', async (req, res, next) => {
+    try {
+      const parsed = seriesStatsQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        return next(new HttpError(400, parsed.error.issues[0]?.message || 'Parâmetros inválidos'));
+      }
+      const { from, to } = parsed.data;
+      const fromDate = parseDateParam(from, 'from');
+      const toDate = parseDateParam(to, 'to');
+      if (fromDate > toDate) {
+        return next(new HttpError(400, 'from tem de ser anterior ou igual a to'));
+      }
+
+      const seller = await prisma.seller.findUniqueOrThrow({ where: { slug: SELLER_SLUG } });
+
+      // Dataset pequeno nesta fase (fase inicial do MVP) — não precisa de
+      // SQL agregado, buscamos tudo e agrupamos em JS.
+      const orders = await prisma.order.findMany({
+        where: {
+          course: { sellerId: seller.id },
+          status: 'PAID',
+          paidAt: { gte: fromDate, lte: toDate },
+        },
+        select: { paidAt: true, amountKz: true },
+      });
+
+      // Pré-preenche TODOS os dias do intervalo com zero (chave YYYY-MM-DD,
+      // dia calendário em UTC) — só depois soma o que vier da BD por cima.
+      const daysByKey = new Map();
+      const cursor = new Date(
+        Date.UTC(fromDate.getUTCFullYear(), fromDate.getUTCMonth(), fromDate.getUTCDate())
+      );
+      const endCursor = new Date(
+        Date.UTC(toDate.getUTCFullYear(), toDate.getUTCMonth(), toDate.getUTCDate())
+      );
+      while (cursor <= endCursor) {
+        const key = cursor.toISOString().slice(0, 10);
+        daysByKey.set(key, { date: key, salesKz: 0, salesCount: 0 });
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+      }
+
+      for (const order of orders) {
+        if (!order.paidAt) continue;
+        const key = order.paidAt.toISOString().slice(0, 10);
+        const entry = daysByKey.get(key);
+        if (!entry) continue; // fora do intervalo (não deveria acontecer, filtro já aplicado)
+        entry.salesKz += order.amountKz;
+        entry.salesCount += 1;
+      }
+
+      res.json({ days: Array.from(daysByKey.values()) });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // Distribuição de vendas por hora do dia (0-23), somando Order PAID do
+  // intervalo pela hora UTC de `paidAt` (documentado: usamos hora UTC, não
+  // hora local de Angola). Sempre as 24 entradas, mesmo sem vendas nalgumas.
+  router.get('/stats/hourly', async (req, res, next) => {
+    try {
+      const parsed = seriesStatsQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        return next(new HttpError(400, parsed.error.issues[0]?.message || 'Parâmetros inválidos'));
+      }
+      const { from, to } = parsed.data;
+      const fromDate = parseDateParam(from, 'from');
+      const toDate = parseDateParam(to, 'to');
+      if (fromDate > toDate) {
+        return next(new HttpError(400, 'from tem de ser anterior ou igual a to'));
+      }
+
+      const seller = await prisma.seller.findUniqueOrThrow({ where: { slug: SELLER_SLUG } });
+
+      const orders = await prisma.order.findMany({
+        where: {
+          course: { sellerId: seller.id },
+          status: 'PAID',
+          paidAt: { gte: fromDate, lte: toDate },
+        },
+        select: { paidAt: true, amountKz: true },
+      });
+
+      // Pré-preenche as 24 horas com zero antes de somar — nunca omitir uma.
+      const hours = Array.from({ length: 24 }, (_, hour) => ({ hour, salesKz: 0, salesCount: 0 }));
+
+      for (const order of orders) {
+        if (!order.paidAt) continue;
+        const hour = order.paidAt.getUTCHours();
+        hours[hour].salesKz += order.amountKz;
+        hours[hour].salesCount += 1;
+      }
+
+      res.json({ hours });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // Vendas por método de pagamento (`provider` da Order PAID) no intervalo.
+  // Só inclui providers que tiveram alguma venda DENTRO do período pedido —
+  // se o período não teve nenhuma venda, devolve providers: [] (a página
+  // trata isso como "sem dados"). `pct` nunca divide por zero.
+  router.get('/stats/by-provider', async (req, res, next) => {
+    try {
+      const parsed = seriesStatsQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        return next(new HttpError(400, parsed.error.issues[0]?.message || 'Parâmetros inválidos'));
+      }
+      const { from, to } = parsed.data;
+      const fromDate = parseDateParam(from, 'from');
+      const toDate = parseDateParam(to, 'to');
+      if (fromDate > toDate) {
+        return next(new HttpError(400, 'from tem de ser anterior ou igual a to'));
+      }
+
+      const seller = await prisma.seller.findUniqueOrThrow({ where: { slug: SELLER_SLUG } });
+
+      const grouped = await prisma.order.groupBy({
+        by: ['provider'],
+        where: {
+          course: { sellerId: seller.id },
+          status: 'PAID',
+          paidAt: { gte: fromDate, lte: toDate },
+        },
+        _sum: { amountKz: true },
+        _count: { _all: true },
+      });
+
+      const totalKz = grouped.reduce((sum, g) => sum + (g._sum.amountKz || 0), 0);
+
+      // Sem nenhuma venda PAID no período: providers vazio, nunca dividir
+      // por zero para calcular pct.
+      const providers = grouped.map((g) => {
+        const salesKz = g._sum.amountKz || 0;
+        return {
+          provider: g.provider,
+          salesKz,
+          salesCount: g._count._all,
+          pct: totalKz > 0 ? Math.round((salesKz / totalKz) * 10000) / 100 : 0,
+        };
+      });
+
+      res.json({ providers });
     } catch (err) {
       next(err);
     }
