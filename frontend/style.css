@@ -746,3 +746,84 @@ main .auth-box {
 
   main .auth-box { margin: 32px auto; padding: 28px 22px; }
 }
+
+/* ============ CONTA / DEFINIÇÕES ============ */
+.account-page {
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.account-section {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 28px 30px;
+  box-shadow: var(--shadow-card);
+  border-top: 4px solid var(--secondary);
+}
+
+.account-section h2 {
+  font-size: 18px;
+  font-weight: 800;
+  margin-bottom: 4px;
+  color: var(--text);
+}
+
+.account-section-sub {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+
+.account-section .btn { margin-top: 4px; }
+
+.twofa-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 999px;
+  margin-bottom: 16px;
+}
+
+.twofa-status-off {
+  background: var(--red-bg);
+  color: var(--red);
+  border: 1px solid var(--red-border);
+}
+
+.twofa-status-on {
+  background: var(--green-bg);
+  color: var(--green);
+  border: 1px solid var(--green-border);
+}
+
+.twofa-setup-box {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px dashed var(--border);
+}
+
+.twofa-qr {
+  display: block;
+  width: 200px;
+  height: 200px;
+  margin: 12px 0;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.twofa-secret {
+  font-family: monospace;
+  font-size: 14px;
+  background: var(--surface);
+  padding: 8px 12px;
+  border-radius: 8px;
+  word-break: break-all;
+  margin-bottom: 16px;
+}

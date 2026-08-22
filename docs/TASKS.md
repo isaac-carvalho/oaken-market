@@ -850,6 +850,90 @@ BD de produção, sessão de admin injectada via JWT assinado com o
   exigem sempre) usando a data de criação do curso mais antigo como
   `from` — nunca poderia haver venda antes de o curso existir.
 
+## Tarefa 22 — Conta / Definições: perfil, password e 2FA (TOTP) ✅ concluída, revista pelo sénior
+
+Referência: rotas reais `/conta`, `/definicoes` e endpoints
+`/api/clients/2fa/*` extraídos do bundle real da Kursinha (ver notas da
+sessão) — página de conta acessível a qualquer utilizador autenticado
+(comprador ou admin), não só ao painel do produtor.
+
+**Backend (`backend/src/routes/auth.js`):**
+- `PATCH /api/auth/me` — só `name` é editável (email é a identidade da
+  conta, mudar exigiria reverificação que ainda não existe).
+- `POST /api/auth/change-password` — exige `currentPassword` +
+  `newPassword` (mesma política do signup: 8+ caracteres, 1 número, 1
+  maiúscula), verifica o hash actual antes de trocar.
+- 2FA por TOTP (`otplib`, secret em `User.twoFactorSecret`/
+  `twoFactorTempSecret`, biblioteca `qrcode` para o QR):
+  - `POST /2fa/setup` — gera segredo novo, guarda em
+    `twoFactorTempSecret` (2FA continua desactivado), devolve
+    `{ secret, otpauthUrl, qrCodeDataUrl }`.
+  - `POST /2fa/verify` — confirma um código de 6 dígitos contra o
+    segredo pendente; só aqui `twoFactorEnabled` passa a `true`.
+  - `POST /2fa/disable` — exige a password actual (não o código TOTP —
+    se a pessoa perdeu o telemóvel, ainda consegue desligar sabendo só a
+    password), limpa os dois segredos.
+  - `POST /login` — com `twoFactorEnabled`, não devolve token completo:
+    devolve `{ requires2FA: true, pendingToken }`. `pendingToken` é
+    opaco (não é JWT, gerado com `crypto.randomBytes`), guardado só em
+    memória do processo (`Map`), TTL de 5 minutos, consumido de uso
+    único (mesmo em tentativa falhada) — nunca aceite por
+    `requireAuth`, não dá acesso a nada além de completar este login.
+  - `POST /2fa/login-verify` — troca `{ pendingToken, token }` pelo
+    token de sessão completo.
+- Migração Prisma `20260822113730_add_2fa_fields` — `twoFactorEnabled`,
+  `twoFactorSecret`, `twoFactorTempSecret` em `User`.
+- `toSafeUser()` nunca deixa `twoFactorSecret`/`twoFactorTempSecret`
+  saírem em nenhuma resposta JSON.
+
+**Frontend:**
+- `frontend/conta.html` (nova página) — secções Perfil, Password e 2FA,
+  atrás de guarda de login (`redirect` para `login.html?next=conta.html`
+  se não houver `token`). Estado real do 2FA vem sempre de
+  `GET /api/auth/me`, nunca só do `localStorage`.
+- `frontend/login.html` — segunda etapa: se `POST /login` devolver
+  `requires2FA`, mostra um campo de código de 6 dígitos e chama
+  `/2fa/login-verify`; só grava `token`/`user` no `localStorage` depois
+  disso.
+- `frontend/app.js` `renderHeader()` — novo link "Conta" ao lado de
+  "Sair" para qualquer sessão activa.
+
+**Critérios de aceitação (sénior valida):**
+- 2FA nunca fica activo só por gerar o QR — só depois de um código real
+  confirmado.
+- `pendingToken` nunca funciona como token de sessão normal.
+- `change-password` e `2fa/disable` recusam com a password errada.
+- Segredos de 2FA nunca aparecem em nenhuma resposta JSON.
+
+**Nota da revisão (testado ao vivo, ponta a ponta, com utilizador
+descartável criado e apagado no fim — nunca a conta admin real):**
+- Corrigido durante a implementação: `otplib@13` (instalado por
+  omissão) tem uma API completamente diferente (plugins, sem o
+  `authenticator` clássico) — rebentava no arranque do servidor
+  (`Cannot set properties of undefined`). Fixado o `package.json` em
+  `otplib@12.0.1`, que tem a API `authenticator.generateSecret/keyuri/
+  verify` usada no código.
+- Fluxo completo testado com códigos TOTP reais gerados (não
+  inventados): setup → código errado rejeitado (400) → código certo
+  aceite (`twoFactorEnabled: true`) → login seguinte devolve
+  `requires2FA` (sem token nem dados do utilizador) →
+  `pendingToken` confirmado que NÃO funciona como token normal em
+  `GET /api/auth/me` (401) → código errado no login-verify rejeitado E
+  queima o `pendingToken` (decisão deliberada: uma tentativa por
+  desafio, reforça o rate limit de 20/15min já existente em todo o
+  `/api/auth/*`) → novo login + código certo completa a sessão →
+  `change-password` testado com password errada (401) e certa (ok) →
+  `2fa/disable` testado com password errada (401) e certa (ok).
+- UI testada ao vivo no browser: login com 2FA activo mostra o segundo
+  ecrã, aceita o código real e entra; `conta.html` mostra o estado real
+  (🔒 Activa / 🔓 Inactiva) vindo de `GET /api/auth/me`, nunca inventado.
+- **Decisão de UX documentada, não é bug:** o `pendingToken` é
+  consumido ao primeiro uso mesmo com código errado — um erro de
+  digitação obriga a repetir o login desde a password. Escolha
+  deliberada de segurança (fecha a janela de força bruta no código de
+  6 dígitos); se a fricção incomodar no uso real, é uma alteração
+  pequena permitir N tentativas antes de invalidar.
+
 ## Notas da revisão do sénior
 
 - **Auth:** corrigido um side-channel de tempo no login — quando o email

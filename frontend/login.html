@@ -56,6 +56,20 @@
         <span id="toggle-text">Ainda não tens conta?</span>
         <button type="button" id="toggle-btn">Criar conta</button>
       </div>
+
+      <div id="twofa-step" class="hidden">
+        <p class="auth-sub">A tua conta tem autenticação de dois factores. Introduz o código de 6 dígitos da tua app autenticadora.</p>
+        <form id="twofa-form">
+          <div class="field">
+            <label for="twofa-code">Código de verificação</label>
+            <input type="text" id="twofa-code" inputmode="numeric" pattern="\d{6}" maxlength="6" required autofocus>
+          </div>
+          <button type="submit" class="btn btn-primary" id="twofa-submit-btn">Confirmar</button>
+        </form>
+        <div class="auth-toggle">
+          <button type="button" id="twofa-back-btn">← Voltar ao login</button>
+        </div>
+      </div>
     </div>
   </div>
 </main>
@@ -110,6 +124,34 @@
 
   toggleBtn.addEventListener('click', () => setMode(mode === 'login' ? 'signup' : 'login'));
 
+  // Segunda etapa (2FA): quando /login devolve requires2FA, guardamos o
+  // pendingToken só em memória (nunca em localStorage) até o código ser
+  // confirmado — só nesse momento é que ficamos com uma sessão real.
+  let pendingToken = null;
+
+  const twofaStep = document.getElementById('twofa-step');
+  const twofaForm = document.getElementById('twofa-form');
+  const twofaCodeInput = document.getElementById('twofa-code');
+  const twofaSubmitBtn = document.getElementById('twofa-submit-btn');
+  const twofaBackBtn = document.getElementById('twofa-back-btn');
+  const authToggle = document.querySelector('.auth-toggle');
+
+  function showTwoFactorStep() {
+    form.classList.add('hidden');
+    authToggle.classList.add('hidden');
+    twofaStep.classList.remove('hidden');
+    twofaCodeInput.focus();
+  }
+
+  function backToLoginForm() {
+    pendingToken = null;
+    twofaForm.reset();
+    twofaStep.classList.add('hidden');
+    form.classList.remove('hidden');
+    authToggle.classList.remove('hidden');
+    clearError(errorBox);
+  }
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     clearError(errorBox);
@@ -130,6 +172,13 @@
         method: 'POST',
         body: JSON.stringify(body),
       });
+
+      if (data.requires2FA) {
+        pendingToken = data.pendingToken;
+        showTwoFactorStep();
+        return;
+      }
+
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       window.location.href = nextUrl;
@@ -139,6 +188,28 @@
       submitBtn.disabled = false;
     }
   });
+
+  twofaForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearError(errorBox);
+    twofaSubmitBtn.disabled = true;
+
+    try {
+      const data = await apiFetch('/api/auth/2fa/login-verify', {
+        method: 'POST',
+        body: JSON.stringify({ pendingToken, token: twofaCodeInput.value.trim() }),
+      });
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      window.location.href = nextUrl;
+    } catch (err) {
+      showError(errorBox, err);
+    } finally {
+      twofaSubmitBtn.disabled = false;
+    }
+  });
+
+  twofaBackBtn.addEventListener('click', backToLoginForm);
 </script>
 </body>
 </html>

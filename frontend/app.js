@@ -123,12 +123,18 @@ function renderHeader() {
     span.className = 'header-user';
     span.textContent = `Olá, ${user.name}`;
 
+    const accountLink = document.createElement('a');
+    accountLink.className = 'btn btn-outline';
+    accountLink.href = 'conta.html';
+    accountLink.textContent = 'Conta';
+
     const btn = document.createElement('button');
     btn.className = 'btn btn-outline';
     btn.textContent = 'Sair';
     btn.addEventListener('click', logout);
 
     el.appendChild(span);
+    el.appendChild(accountLink);
     el.appendChild(btn);
   } else {
     el.innerHTML = '';

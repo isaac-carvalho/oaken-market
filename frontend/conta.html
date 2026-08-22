@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="pt-AO">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>A minha conta — Oaken Market</title>
+<script>
+  // Aplica o tema guardado antes do primeiro paint, para evitar "flash"
+  // do tema errado enquanto o resto do JS carrega.
+  (function () {
+    if (localStorage.getItem('theme') === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  })();
+</script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <div class="container hflex">
+    <a class="logo" href="index.html">OAKEN <span>MARKET</span></a>
+    <div class="header-right">
+      <a class="btn btn-outline" href="explorar.html">Explorar</a>
+      <button type="button" id="theme-toggle-btn" class="theme-toggle" onclick="toggleTheme()" aria-label="Mudar tema">🌙</button>
+      <div id="header-actions"></div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="container catalog-section">
+    <h2 class="section-title">A minha conta</h2>
+    <p class="section-sub">Perfil, password e segurança de início de sessão.</p>
+
+    <div id="error-box" class="alert alert-error hidden"></div>
+    <div id="success-box" class="alert alert-success hidden"></div>
+
+    <div class="account-page">
+      <div class="account-section">
+        <h2>Perfil</h2>
+        <p class="account-section-sub">O email é a tua identidade de conta e não pode ser alterado aqui.</p>
+        <form id="profile-form">
+          <div class="field">
+            <label for="profile-email">Email</label>
+            <input type="email" id="profile-email" disabled>
+          </div>
+          <div class="field">
+            <label for="profile-name">Nome</label>
+            <input type="text" id="profile-name" required>
+          </div>
+          <button type="submit" class="btn btn-primary" id="profile-submit-btn">Guardar alterações</button>
+        </form>
+      </div>
+
+      <div class="account-section">
+        <h2>Password</h2>
+        <p class="account-section-sub">Mínimo 8 caracteres, com pelo menos 1 número e 1 maiúscula.</p>
+        <form id="password-form">
+          <div class="field">
+            <label for="current-password">Password actual</label>
+            <input type="password" id="current-password" autocomplete="current-password" required>
+          </div>
+          <div class="field">
+            <label for="new-password">Nova password</label>
+            <input type="password" id="new-password" autocomplete="new-password" required>
+          </div>
+          <div class="field">
+            <label for="confirm-password">Confirmar nova password</label>
+            <input type="password" id="confirm-password" autocomplete="new-password" required>
+          </div>
+          <button type="submit" class="btn btn-primary" id="password-submit-btn">Alterar password</button>
+        </form>
+      </div>
+
+      <div class="account-section">
+        <h2>Autenticação de dois factores (2FA)</h2>
+        <p class="account-section-sub">Pede um código de 6 dígitos da app autenticadora (Google Authenticator, Authy, etc.) sempre que iniciares sessão.</p>
+
+        <div id="twofa-status-off" class="twofa-status twofa-status-off hidden">🔓 Inactiva</div>
+        <div id="twofa-status-on" class="twofa-status twofa-status-on hidden">🔒 Activa</div>
+
+        <div id="twofa-enable-section" class="hidden">
+          <button type="button" class="btn btn-outline" id="twofa-setup-btn">Activar 2FA</button>
+
+          <div id="twofa-setup-box" class="twofa-setup-box hidden">
+            <p class="account-section-sub">1. Digitaliza este código com a tua app autenticadora:</p>
+            <img id="twofa-qr" class="twofa-qr" alt="Código QR do 2FA">
+            <p class="account-section-sub">Ou introduz manualmente:</p>
+            <div class="twofa-secret" id="twofa-secret"></div>
+            <form id="twofa-verify-form">
+              <div class="field">
+                <label for="twofa-verify-code">2. Introduz o código de 6 dígitos gerado pela app</label>
+                <input type="text" id="twofa-verify-code" inputmode="numeric" pattern="\d{6}" maxlength="6" required>
+              </div>
+              <button type="submit" class="btn btn-primary" id="twofa-verify-btn">Confirmar e activar</button>
+            </form>
+          </div>
+        </div>
+
+        <div id="twofa-disable-section" class="hidden">
+          <button type="button" class="btn btn-outline" id="twofa-show-disable-btn">Desactivar 2FA</button>
+          <form id="twofa-disable-form" class="hidden">
+            <div class="field">
+              <label for="twofa-disable-password">Confirma a tua password para desactivar</label>
+              <input type="password" id="twofa-disable-password" autocomplete="current-password" required>
+            </div>
+            <button type="submit" class="btn btn-primary" id="twofa-disable-btn">Confirmar desactivação</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="app.js"></script>
+<script>
+  initTheme();
+  renderHeader();
+
+  if (!localStorage.getItem('token')) {
+    window.location.href = 'login.html?next=conta.html';
+  }
+
+  const errorBox = document.getElementById('error-box');
+  const successBox = document.getElementById('success-box');
+
+  function showSuccess(message) {
+    clearError(errorBox);
+    successBox.textContent = message;
+    successBox.classList.remove('hidden');
+  }
+
+  function clearSuccess() {
+    successBox.textContent = '';
+    successBox.classList.add('hidden');
+  }
+
+  // ---------- Perfil ----------
+  const profileForm = document.getElementById('profile-form');
+  const profileEmailInput = document.getElementById('profile-email');
+  const profileNameInput = document.getElementById('profile-name');
+  const profileSubmitBtn = document.getElementById('profile-submit-btn');
+
+  let currentUser = getStoredUser();
+
+  function applyUserToForm(user) {
+    currentUser = user;
+    localStorage.setItem('user', JSON.stringify(user));
+    profileEmailInput.value = user.email;
+    profileNameInput.value = user.name;
+    renderTwoFactorSection(user);
+  }
+
+  if (currentUser) {
+    profileEmailInput.value = currentUser.email;
+    profileNameInput.value = currentUser.name;
+  }
+
+  profileForm.addEventListener('submit', async (evt) => {
+    evt.preventDefault();
+    clearError(errorBox);
+    clearSuccess();
+    profileSubmitBtn.disabled = true;
+
+    try {
+      const data = await apiFetch('/api/auth/me', {
+        method: 'PATCH',
+        body: JSON.stringify({ name: profileNameInput.value.trim() }),
+      });
+      applyUserToForm(data.user);
+      renderHeader();
+      showSuccess('Perfil actualizado.');
+    } catch (err) {
+      showError(errorBox, err);
+    } finally {
+      profileSubmitBtn.disabled = false;
+    }
+  });
+
+  // ---------- Password ----------
+  const passwordForm = document.getElementById('password-form');
+  const currentPasswordInput = document.getElementById('current-password');
+  const newPasswordInput = document.getElementById('new-password');
+  const confirmPasswordInput = document.getElementById('confirm-password');
+  const passwordSubmitBtn = document.getElementById('password-submit-btn');
+
+  passwordForm.addEventListener('submit', async (evt) => {
+    evt.preventDefault();
+    clearError(errorBox);
+    clearSuccess();
+
+    if (newPasswordInput.value !== confirmPasswordInput.value) {
+      showError(errorBox, new Error('A confirmação não corresponde à nova password.'));
+      return;
+    }
+
+    passwordSubmitBtn.disabled = true;
+    try {
+      await apiFetch('/api/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({
+          currentPassword: currentPasswordInput.value,
+          newPassword: newPasswordInput.value,
+        }),
+      });
+      passwordForm.reset();
+      showSuccess('Password alterada.');
+    } catch (err) {
+      showError(errorBox, err);
+    } finally {
+      passwordSubmitBtn.disabled = false;
+    }
+  });
+
+  // ---------- 2FA ----------
+  const statusOff = document.getElementById('twofa-status-off');
+  const statusOn = document.getElementById('twofa-status-on');
+  const enableSection = document.getElementById('twofa-enable-section');
+  const disableSection = document.getElementById('twofa-disable-section');
+  const setupBtn = document.getElementById('twofa-setup-btn');
+  const setupBox = document.getElementById('twofa-setup-box');
+  const qrImg = document.getElementById('twofa-qr');
+  const secretEl = document.getElementById('twofa-secret');
+  const verifyForm = document.getElementById('twofa-verify-form');
+  const verifyCodeInput = document.getElementById('twofa-verify-code');
+  const verifyBtn = document.getElementById('twofa-verify-btn');
+  const showDisableBtn = document.getElementById('twofa-show-disable-btn');
+  const disableForm = document.getElementById('twofa-disable-form');
+  const disablePasswordInput = document.getElementById('twofa-disable-password');
+  const disableBtn = document.getElementById('twofa-disable-btn');
+
+  function renderTwoFactorSection(user) {
+    const enabled = !!user.twoFactorEnabled;
+    statusOff.classList.toggle('hidden', enabled);
+    statusOn.classList.toggle('hidden', !enabled);
+    enableSection.classList.toggle('hidden', enabled);
+    disableSection.classList.toggle('hidden', !enabled);
+    setupBox.classList.add('hidden');
+    disableForm.classList.add('hidden');
+  }
+
+  setupBtn.addEventListener('click', async () => {
+    clearError(errorBox);
+    clearSuccess();
+    setupBtn.disabled = true;
+    try {
+      const data = await apiFetch('/api/auth/2fa/setup', { method: 'POST' });
+      qrImg.src = data.qrCodeDataUrl;
+      secretEl.textContent = data.secret;
+      setupBox.classList.remove('hidden');
+    } catch (err) {
+      showError(errorBox, err);
+    } finally {
+      setupBtn.disabled = false;
+    }
+  });
+
+  verifyForm.addEventListener('submit', async (evt) => {
+    evt.preventDefault();
+    clearError(errorBox);
+    clearSuccess();
+    verifyBtn.disabled = true;
+    try {
+      await apiFetch('/api/auth/2fa/verify', {
+        method: 'POST',
+        body: JSON.stringify({ token: verifyCodeInput.value.trim() }),
+      });
+      verifyForm.reset();
+      const me = await apiFetch('/api/auth/me');
+      applyUserToForm(me.user);
+      showSuccess('2FA activado — a partir de agora vais precisar do código para iniciar sessão.');
+    } catch (err) {
+      showError(errorBox, err);
+    } finally {
+      verifyBtn.disabled = false;
+    }
+  });
+
+  showDisableBtn.addEventListener('click', () => {
+    disableForm.classList.remove('hidden');
+  });
+
+  disableForm.addEventListener('submit', async (evt) => {
+    evt.preventDefault();
+    clearError(errorBox);
+    clearSuccess();
+    disableBtn.disabled = true;
+    try {
+      await apiFetch('/api/auth/2fa/disable', {
+        method: 'POST',
+        body: JSON.stringify({ password: disablePasswordInput.value }),
+      });
+      disableForm.reset();
+      const me = await apiFetch('/api/auth/me');
+      applyUserToForm(me.user);
+      showSuccess('2FA desactivado.');
+    } catch (err) {
+      showError(errorBox, err);
+    } finally {
+      disableBtn.disabled = false;
+    }
+  });
+
+  // Carrega o estado real do utilizador (nunca confia só no localStorage
+  // para decidir se o 2FA está activo — pode estar desactualizado).
+  (async () => {
+    if (!currentUser) return;
+    try {
+      const data = await apiFetch('/api/auth/me');
+      applyUserToForm(data.user);
+    } catch (err) {
+      showError(errorBox, err);
+    }
+  })();
+</script>
+</body>
+</html>

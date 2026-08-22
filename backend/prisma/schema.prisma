@@ -45,6 +45,14 @@ model User {
   role         UserRole @default(BUYER)
   createdAt    DateTime @default(now())
 
+  // 2FA (TOTP). twoFactorSecret só é preenchido depois de o utilizador
+  // confirmar um código válido (ver POST /api/auth/2fa/verify) — nunca
+  // fica activo só por ter gerado um QR code. twoFactorTempSecret guarda
+  // o segredo enquanto a configuração está pendente de confirmação.
+  twoFactorEnabled    Boolean @default(false)
+  twoFactorSecret     String?
+  twoFactorTempSecret String?
+
   orders       Order[]
   enrollments  Enrollment[]
   affiliations Affiliate[]
