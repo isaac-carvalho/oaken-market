@@ -54,6 +54,9 @@ module.exports = function (env) {
         where: { slug: req.params.slug },
         include: {
           seller: { select: { slug: true } },
+          checkout: {
+            include: { bumpCourse: { select: { id: true, slug: true, title: true, published: true } } },
+          },
           modules: {
             orderBy: { order: 'asc' },
             include: {
@@ -106,6 +109,27 @@ module.exports = function (env) {
         ),
       }));
 
+      // Só mostra o bump a quem ainda não tem o curso principal (não faz
+      // sentido oferecer um upsell no checkout de quem já vai comprar) —
+      // e só se o checkout estiver activo, com bump definido, e o curso do
+      // bump ainda publicado (pode ter sido despublicado depois de
+      // configurado como bump).
+      const bumpOffer =
+        !enrolled &&
+        course.checkout?.active &&
+        course.checkout.bumpCourseId &&
+        course.checkout.bumpCourse?.published
+          ? {
+              course: {
+                id: course.checkout.bumpCourse.id,
+                slug: course.checkout.bumpCourse.slug,
+                title: course.checkout.bumpCourse.title,
+              },
+              priceKz: course.checkout.bumpPriceKz,
+              headline: course.checkout.bumpHeadline,
+            }
+          : null;
+
       res.json({
         course: {
           id: course.id,
@@ -116,6 +140,7 @@ module.exports = function (env) {
           coverUrl: course.coverUrl,
           published: course.published,
           modules,
+          bumpOffer,
         },
         enrolled,
       });

@@ -147,10 +147,35 @@
     price.textContent = formatKz(course.priceKz);
     buyBox.appendChild(price);
 
+    let bumpCheckbox = null;
+    if (course.bumpOffer) {
+      const bumpBox = document.createElement('label');
+      bumpBox.className = 'order-bump-box';
+      bumpCheckbox = document.createElement('input');
+      bumpCheckbox.type = 'checkbox';
+      bumpCheckbox.id = 'order-bump-checkbox';
+
+      const bumpText = document.createElement('div');
+      bumpText.className = 'order-bump-text';
+      bumpText.innerHTML = `
+        <strong>${course.bumpOffer.headline || `Adiciona "${course.bumpOffer.course.title}"`}</strong>
+        <span>+ ${formatKz(course.bumpOffer.priceKz)}</span>
+      `;
+
+      bumpBox.appendChild(bumpCheckbox);
+      bumpBox.appendChild(bumpText);
+      buyBox.appendChild(bumpBox);
+
+      bumpCheckbox.addEventListener('change', () => {
+        const total = course.priceKz + (bumpCheckbox.checked ? course.bumpOffer.priceKz : 0);
+        price.textContent = formatKz(total);
+      });
+    }
+
     const btn = document.createElement('button');
     btn.className = 'btn btn-primary';
     btn.textContent = 'Comprar';
-    btn.addEventListener('click', () => buyCourse(course, btn));
+    btn.addEventListener('click', () => buyCourse(course, btn, bumpCheckbox));
     buyBox.appendChild(btn);
 
     renderAffiliateBox(course);
@@ -262,7 +287,7 @@
     }
   }
 
-  async function buyCourse(course, btn) {
+  async function buyCourse(course, btn, bumpCheckbox) {
     clearError(errorBox);
     successBox.classList.add('hidden');
 
@@ -279,6 +304,9 @@
       const orderBody = { courseId: course.id, provider: 'manual' };
       if (refParam) {
         orderBody.affiliateRef = refParam;
+      }
+      if (bumpCheckbox && bumpCheckbox.checked) {
+        orderBody.bumpCourseId = course.bumpOffer.course.id;
       }
 
       const orderData = await apiFetch('/api/orders', {

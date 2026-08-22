@@ -453,6 +453,37 @@ main { padding-bottom: 70px; }
 
 .buy-box .btn-primary { width: 100%; }
 
+.order-bump-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px dashed var(--secondary);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  cursor: pointer;
+}
+
+.order-bump-box input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: var(--secondary);
+}
+
+.order-bump-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+}
+
+.order-bump-text strong { color: var(--text); }
+.order-bump-text span { color: var(--secondary); font-weight: 700; }
+
 .enrolled-badge {
   display: inline-flex;
   align-items: center;

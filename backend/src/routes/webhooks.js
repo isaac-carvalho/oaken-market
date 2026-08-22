@@ -30,6 +30,8 @@ async function dispatchOrderPaidWebhooks(order) {
     courseId: order.courseId,
     amountKz: order.amountKz,
     commissionKz: order.commissionKz ?? null,
+    bumpCourseId: order.bumpCourseId ?? null,
+    bumpAmountKz: order.bumpAmountKz ?? null,
     paidAt: order.paidAt,
   };
   const body = JSON.stringify(payload);
@@ -130,6 +132,21 @@ module.exports = function (env) {
             orderId: order.id,
           },
         });
+
+        // Order bump: se a encomenda incluiu um segundo curso, matricula
+        // também nesse — mesma Order, 2 Enrollment (@@unique(userId,
+        // courseId) continua a garantir que nunca duplica).
+        if (order.bumpCourseId) {
+          await tx.enrollment.upsert({
+            where: { userId_courseId: { userId: order.userId, courseId: order.bumpCourseId } },
+            update: {},
+            create: {
+              userId: order.userId,
+              courseId: order.bumpCourseId,
+              orderId: order.id,
+            },
+          });
+        }
       });
 
       // A Order já está confirmada como PAID na BD neste ponto — o disparo

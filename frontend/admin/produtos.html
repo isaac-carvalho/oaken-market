@@ -124,6 +124,41 @@
   </div>
 </div>
 
+<!-- Modal: configurar checkout (order bump) -->
+<div id="checkout-modal-overlay" class="modal-overlay hidden">
+  <div class="modal-box">
+    <h2>Configurar checkout</h2>
+    <p class="account-section-sub" id="checkout-modal-course-name"></p>
+    <div id="checkout-modal-error" class="alert alert-error hidden"></div>
+    <form id="checkout-form">
+      <div class="field">
+        <label for="co-bump-course">Order bump (curso oferecido no checkout)</label>
+        <select id="co-bump-course">
+          <option value="">Nenhum</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="co-bump-price">Preço do bump (Kz)</label>
+        <input type="number" id="co-bump-price" min="1" step="1">
+      </div>
+      <div class="field">
+        <label for="co-bump-headline">Texto de venda do bump</label>
+        <input type="text" id="co-bump-headline" maxlength="200" placeholder="Ex: Adiciona também X por só Y Kz">
+      </div>
+      <div class="field">
+        <label style="display:flex; align-items:center; gap:8px; font-weight:400;">
+          <input type="checkbox" id="co-active" style="width:auto;" checked>
+          Checkout activo
+        </label>
+      </div>
+      <div style="display:flex; gap:10px; margin-top:20px;">
+        <button type="button" id="checkout-modal-cancel-btn" class="btn btn-outline btn-block">Cancelar</button>
+        <button type="submit" id="checkout-modal-submit-btn" class="btn btn-primary btn-block">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script src="../app.js"></script>
 <script src="admin.js"></script>
 <script>
@@ -183,6 +218,7 @@
           <button type="button" class="btn btn-outline btn-sm btn-block toggle-publish-btn">
             ${course.published ? 'Despublicar' : 'Publicar'}
           </button>
+          <button type="button" class="btn btn-outline btn-sm btn-block checkout-btn">Configurar checkout</button>
         </div>
       `;
 
@@ -202,8 +238,12 @@
         }
       });
 
+      card.querySelector('.checkout-btn').addEventListener('click', () => openCheckoutModal(course));
+
       return card;
     }
+
+    let allCourses = [];
 
     async function loadCourses() {
       clearError(errorBox);
@@ -215,18 +255,106 @@
         const data = await apiFetch('/api/admin/courses');
         loading.classList.add('hidden');
 
-        const courses = data.courses || [];
-        if (courses.length === 0) {
+        allCourses = data.courses || [];
+        if (allCourses.length === 0) {
           emptyState.classList.remove('hidden');
           return;
         }
 
-        courses.forEach((course) => grid.appendChild(productCard(course)));
+        allCourses.forEach((course) => grid.appendChild(productCard(course)));
       } catch (err) {
         loading.classList.add('hidden');
         showError(errorBox, err);
       }
     }
+
+    // ---------- Configurar checkout (order bump) ----------
+    const checkoutOverlay = document.getElementById('checkout-modal-overlay');
+    const checkoutModalError = document.getElementById('checkout-modal-error');
+    const checkoutModalCourseName = document.getElementById('checkout-modal-course-name');
+    const checkoutForm = document.getElementById('checkout-form');
+    const checkoutSubmitBtn = document.getElementById('checkout-modal-submit-btn');
+    const bumpCourseSelect = document.getElementById('co-bump-course');
+    const bumpPriceInput = document.getElementById('co-bump-price');
+    const bumpHeadlineInput = document.getElementById('co-bump-headline');
+    const activeCheckbox = document.getElementById('co-active');
+
+    let checkoutModalCourse = null;
+
+    async function openCheckoutModal(course) {
+      checkoutModalCourse = course;
+      checkoutModalCourseName.textContent = `Checkout de "${course.title}"`;
+      clearError(checkoutModalError);
+      checkoutForm.reset();
+      activeCheckbox.checked = true;
+
+      // Só cursos publicados e diferentes deste podem ser oferecidos como
+      // bump — nunca o próprio curso, nunca um rascunho.
+      bumpCourseSelect.innerHTML = '<option value="">Nenhum</option>' +
+        allCourses
+          .filter((c) => c.id !== course.id && c.published)
+          .map((c) => `<option value="${c.id}">${c.title}</option>`)
+          .join('');
+
+      checkoutOverlay.classList.remove('hidden');
+
+      try {
+        const data = await apiFetch(`/api/admin/courses/${course.id}/checkout`);
+        const checkout = data.checkout;
+        if (checkout) {
+          bumpCourseSelect.value = checkout.bumpCourseId || '';
+          bumpPriceInput.value = checkout.bumpPriceKz || '';
+          bumpHeadlineInput.value = checkout.bumpHeadline || '';
+          activeCheckbox.checked = checkout.active;
+        }
+      } catch (err) {
+        showError(checkoutModalError, err);
+      }
+    }
+
+    function closeCheckoutModal() {
+      checkoutOverlay.classList.add('hidden');
+      checkoutModalCourse = null;
+    }
+
+    document.getElementById('checkout-modal-cancel-btn').addEventListener('click', closeCheckoutModal);
+    checkoutOverlay.addEventListener('click', (e) => { if (e.target === checkoutOverlay) closeCheckoutModal(); });
+
+    checkoutForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearError(checkoutModalError);
+      checkoutSubmitBtn.disabled = true;
+
+      const bumpCourseId = bumpCourseSelect.value || null;
+      const body = { active: activeCheckbox.checked };
+
+      if (bumpCourseId) {
+        const bumpPrice = Number(bumpPriceInput.value);
+        if (!bumpPrice || bumpPrice <= 0) {
+          showError(checkoutModalError, new Error('Define um preço válido para o bump.'));
+          checkoutSubmitBtn.disabled = false;
+          return;
+        }
+        body.bumpCourseId = bumpCourseId;
+        body.bumpPriceKz = bumpPrice;
+        const headline = bumpHeadlineInput.value.trim();
+        if (headline) body.bumpHeadline = headline;
+      } else {
+        body.bumpCourseId = null;
+      }
+
+      try {
+        await apiFetch(`/api/admin/courses/${checkoutModalCourse.id}/checkout`, {
+          method: 'PUT',
+          body: JSON.stringify(body),
+        });
+        closeCheckoutModal();
+      } catch (err) {
+        showError(checkoutModalError, err);
+      } finally {
+        checkoutSubmitBtn.disabled = false;
+      }
+    });
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();

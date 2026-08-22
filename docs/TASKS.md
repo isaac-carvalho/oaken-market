@@ -934,6 +934,89 @@ descartável criado e apagado no fim — nunca a conta admin real):**
   6 dígitos); se a fricção incomodar no uso real, é uma alteração
   pequena permitir N tentativas antes de invalidar.
 
+## Tarefa 23 — Checkout: order bump real ✅ concluída, revista pelo sénior
+
+Referência: rotas reais `/checkouts`, `/checkouts/novo` e
+`/api/checkouts/preview` extraídas do bundle da Kursinha. Escopo
+deliberadamente reduzido face ao "checkout builder" completo deles (que
+deixa personalizar copy/cores da própria página de checkout) — o que
+tem valor real aqui é o order bump funcionar de verdade, que é
+exactamente o que tinha sido explicitamente excluído/fingido antes
+(ver Tarefa 20: "nenhum Order bump nem link morto").
+
+**Modelo de dados:**
+- `Checkout` (novo) — 1:1 com `Course` (`courseId` único). Cobre só o
+  order bump por agora: `bumpCourseId`, `bumpPriceKz` (preço próprio do
+  bump, independente do `priceKz` normal desse curso), `bumpHeadline`,
+  `active`.
+- `Order` ganha `bumpCourseId`/`bumpAmountKz` — `bumpAmountKz` já vem
+  somado dentro de `amountKz` (nunca um valor à parte).
+- `Enrollment.orderId` deixou de ser único (`@unique` removido) — uma
+  Order com bump gera 2 Enrollment (curso principal + bump) apontando
+  para a mesma Order. A garantia real contra duplicação continua a ser
+  `@@unique([userId, courseId])`.
+- Migração `20260822115406_add_checkout_and_order_bump`.
+
+**Backend:**
+- `GET/PUT /api/admin/courses/:id/checkout` — configurar o bump. Recusa
+  bump em si mesmo, curso de bump não publicado, ou preço em falta ao
+  definir um bump. `bumpCourseId: null` limpa preço/headline juntos
+  (nunca deixa um preço órfão).
+- `GET /api/courses/:slug` passa a incluir `course.bumpOffer` — só
+  aparece se `enrolled: false`, checkout activo, bump definido, E o
+  curso do bump continuar publicado.
+- `POST /api/orders` aceita `bumpCourseId` opcional — mesma disciplina
+  do `affiliateRef`: nunca rebenta a compra. Só é aceite se bater
+  exactamente com o bump activo configurado nesse curso, o curso do
+  bump continuar publicado, e o comprador ainda não o ter; qualquer
+  divergência (adulterado, curso errado, já possui) é ignorada em
+  silêncio e a compra continua só com o curso principal.
+- Webhook de confirmação (`webhooks.js`) cria os 2 `Enrollment` (curso +
+  bump) dentro da mesma transacção, e o payload de saída
+  (`X-Oaken-Signature`) passa a incluir `bumpCourseId`/`bumpAmountKz`.
+- `commissionKz` do afiliado continua calculado só sobre o curso
+  principal, nunca sobre o bump — decisão deliberada.
+
+**Frontend:**
+- `admin/produtos.html` — botão "Configurar checkout" por curso, abre
+  modal com select de curso-bump (só cursos publicados, exclui o
+  próprio), preço, texto de venda e activo/inactivo.
+- `curso.html` — mostra o bump como checkbox com preço, actualiza o
+  preço total ao vivo ao marcar/desmarcar, e envia `bumpCourseId` na
+  compra se marcado.
+
+**Critérios de aceitação (sénior valida):**
+- `amountKz` da encomenda é sempre curso + bump quando o bump é aceite.
+- `bumpCourseId` adulterado/inválido nunca bloqueia a compra do curso
+  principal.
+- Webhook duplicado nunca cria matrícula a mais (nem no curso principal
+  nem no bump).
+
+**Nota da revisão (testado ao vivo, ponta a ponta, contra os 5 cursos
+reais e 2 utilizadores descartáveis criados e apagados no fim — nunca
+tocou na única compra real de produção, offshore/299 000 Kz):**
+- Configurado um bump real (Administrativo → +Contabilidade, 50 000 Kz)
+  via API admin: recusa bump em si mesmo (400), recusa sem preço (400),
+  aceita configuração válida.
+- `GET /api/courses/administrativo` público devolveu `bumpOffer`
+  correcto (curso, preço, headline).
+- Compra com bump: `amountKz` = 349 000 Kz (299 000 + 50 000),
+  confirmada via webhook manual → Order `PAID`, **2 Enrollment**
+  criados (`administrativo` + `contabilidade`), mesma `orderId`.
+- Compra com `bumpCourseId` adulterado (curso diferente do configurado):
+  ignorado em silêncio, `amountKz` = 299 000, `bumpCourseId: null` na
+  resposta — compra do curso principal não falhou.
+- Reentrega do mesmo webhook (idempotência): `alreadyProcessed: true`,
+  contagem de Enrollment do utilizador continuou em 2 (nenhuma
+  duplicação, nem no principal nem no bump).
+- Remoção do bump (`bumpCourseId: null`) limpa preço e headline juntos.
+- UI ao vivo: `curso.html?slug=administrativo` mostra a caixa do bump
+  com o texto e preço certos; marcar o checkbox actualiza o preço total
+  de 299 000 para 349 000 Kz ao vivo, sem reload.
+- Limpeza final: utilizadores/encomendas/matrículas de teste apagados,
+  `Checkout` de teste removido — confirmado 0 checkouts e só a compra
+  real (offshore) continua `PAID` na BD depois da limpeza.
+
 ## Notas da revisão do sénior
 
 - **Auth:** corrigido um side-channel de tempo no login — quando o email

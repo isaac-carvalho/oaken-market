@@ -76,6 +76,18 @@ const createWebhookSchema = z
   })
   .strict();
 
+// bumpCourseId: null explícito remove o bump (limpa também preço/headline
+// no handler); omitido = não mexe no bump actual. Quando definido (string),
+// bumpPriceKz passa a obrigatório — não faz sentido um bump sem preço.
+const updateCheckoutSchema = z
+  .object({
+    bumpCourseId: z.string().uuid('bumpCourseId inválido').nullable().optional(),
+    bumpPriceKz: z.number().int('bumpPriceKz tem de ser inteiro').positive('bumpPriceKz tem de ser positivo').nullable().optional(),
+    bumpHeadline: z.string().trim().min(1).max(200).nullable().optional(),
+    active: z.boolean().optional(),
+  })
+  .strict();
+
 const listOrdersQuerySchema = z
   .object({
     status: z.enum(ORDER_STATUSES).optional(),
@@ -192,6 +204,78 @@ module.exports = function (env) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
         return next(new HttpError(404, 'Curso não encontrado'));
       }
+      next(err);
+    }
+  });
+
+  // Devolve a config de checkout do curso — nunca 404 se ainda não existir
+  // (é o estado normal de um curso recém-criado), devolve null.
+  router.get('/courses/:id/checkout', async (req, res, next) => {
+    try {
+      const checkout = await prisma.checkout.findUnique({
+        where: { courseId: req.params.id },
+        include: { bumpCourse: { select: { id: true, slug: true, title: true } } },
+      });
+      res.json({ checkout });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // Upsert da config de checkout — cria na primeira vez, actualiza depois.
+  // bumpCourseId: null limpa o bump inteiro (preço e headline também, para
+  // nunca sobrar um preço órfão sem curso associado).
+  router.put('/courses/:id/checkout', async (req, res, next) => {
+    try {
+      const parsed = updateCheckoutSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return next(new HttpError(400, parsed.error.issues[0]?.message || 'Dados inválidos'));
+      }
+      const { bumpCourseId, bumpPriceKz, bumpHeadline, active } = parsed.data;
+
+      const course = await prisma.course.findUnique({ where: { id: req.params.id } });
+      if (!course) {
+        return next(new HttpError(404, 'Curso não encontrado'));
+      }
+
+      let bumpData = {};
+      if (bumpCourseId === null) {
+        // Remover o bump — limpa tudo o que dependia dele.
+        bumpData = { bumpCourseId: null, bumpPriceKz: null, bumpHeadline: null };
+      } else if (bumpCourseId !== undefined) {
+        if (bumpCourseId === course.id) {
+          return next(new HttpError(400, 'Um curso não pode ser bump de si mesmo'));
+        }
+        const bumpCourse = await prisma.course.findUnique({ where: { id: bumpCourseId } });
+        if (!bumpCourse || !bumpCourse.published || bumpCourse.sellerId !== course.sellerId) {
+          return next(new HttpError(404, 'Curso de order bump não encontrado ou não publicado'));
+        }
+        if (bumpPriceKz == null) {
+          return next(new HttpError(400, 'bumpPriceKz é obrigatório ao definir um order bump'));
+        }
+        bumpData = { bumpCourseId, bumpPriceKz, ...(bumpHeadline !== undefined ? { bumpHeadline } : {}) };
+      } else if (bumpPriceKz !== undefined || bumpHeadline !== undefined) {
+        // bumpCourseId não veio neste pedido, mas preço/headline vieram —
+        // só faz sentido se já existir um bump configurado.
+        const existing = await prisma.checkout.findUnique({ where: { courseId: course.id } });
+        if (!existing || !existing.bumpCourseId) {
+          return next(new HttpError(400, 'Define bumpCourseId antes de definir preço/headline do bump'));
+        }
+        bumpData = {
+          ...(bumpPriceKz !== undefined ? { bumpPriceKz } : {}),
+          ...(bumpHeadline !== undefined ? { bumpHeadline } : {}),
+        };
+      }
+
+      const checkout = await prisma.checkout.upsert({
+        where: { courseId: course.id },
+        create: { courseId: course.id, ...bumpData, ...(active !== undefined ? { active } : {}) },
+        update: { ...bumpData, ...(active !== undefined ? { active } : {}) },
+        include: { bumpCourse: { select: { id: true, slug: true, title: true } } },
+      });
+
+      res.json({ checkout });
+    } catch (err) {
       next(err);
     }
   });

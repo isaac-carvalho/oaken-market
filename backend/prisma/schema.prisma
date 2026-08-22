@@ -86,6 +86,34 @@ model Course {
   orders       Order[]
   enrollments  Enrollment[]
   affiliates   Affiliate[]
+
+  // Config de checkout deste curso como produto principal (1:1) — ver
+  // Checkout abaixo. bumpOffersFor é o inverso: checkouts de OUTROS
+  // cursos que oferecem este aqui como order bump.
+  checkout      Checkout?
+  bumpOffersFor Checkout[] @relation("BumpOffer")
+  bumpOrders    Order[]    @relation("OrderBumpCourse")
+}
+
+// Configuração de checkout de um curso — hoje só cobre o order bump (um
+// segundo curso oferecido no momento do pagamento, com preço próprio).
+// Um curso só pode ter UM checkout (courseId único) e só pode oferecer
+// UM bump por agora — mantém simples enquanto não houver procura real
+// por mais do que isso.
+model Checkout {
+  id           String   @id @default(uuid())
+  courseId     String   @unique
+  course       Course   @relation(fields: [courseId], references: [id])
+  bumpCourseId String?
+  bumpCourse   Course?  @relation("BumpOffer", fields: [bumpCourseId], references: [id])
+  // Preço do bump é sempre independente do priceKz normal do curso do
+  // bump — é uma oferta especial só visível neste checkout, nunca o
+  // preço de tabela desse curso.
+  bumpPriceKz  Int?
+  bumpHeadline String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model Module {
@@ -134,12 +162,21 @@ model Order {
   // Indicação (opcional) — preenchida se a compra veio de um link de
   // afiliado aprovado. commissionKz é só informativo (o que o afiliado
   // teria a receber) — não existe saque de comissão enquanto não houver
-  // pagamento real, mesma regra do saldo em Financeiro.
+  // pagamento real, mesma regra do saldo em Financeiro. Calculado só
+  // sobre o curso principal (courseId), nunca sobre o bump.
   affiliateId   String?
   affiliate     Affiliate? @relation(fields: [affiliateId], references: [id])
   commissionKz  Int?
 
-  enrollment  Enrollment?
+  // Order bump (opcional) — um segundo curso comprado junto com o
+  // principal, oferecido no checkout (ver Checkout). bumpAmountKz já
+  // está incluído em amountKz (amountKz = preço do curso + bumpAmountKz)
+  // — nunca um valor à parte que precise de ser somado manualmente.
+  bumpCourseId String?
+  bumpCourse   Course?  @relation("OrderBumpCourse", fields: [bumpCourseId], references: [id])
+  bumpAmountKz Int?
+
+  enrollments Enrollment[]
 
   @@unique([provider, providerRef])
 }
@@ -179,7 +216,10 @@ model Enrollment {
   user      User     @relation(fields: [userId], references: [id])
   courseId  String
   course    Course   @relation(fields: [courseId], references: [id])
-  orderId   String   @unique
+  // Já não é único: uma Order com order bump gera 2 Enrollment (curso
+  // principal + bump), ambos apontando para a mesma Order. A garantia
+  // real contra duplicação é @@unique([userId, courseId]) abaixo.
+  orderId   String
   order     Order    @relation(fields: [orderId], references: [id])
   createdAt DateTime @default(now())
 
