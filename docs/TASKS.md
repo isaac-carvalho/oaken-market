@@ -808,6 +808,48 @@ Em `frontend/explorar.html`:
 - Nenhum "Order bump" nem qualquer link que não leve a lado nenhum.
 - `node --check` limpo.
 
+## Tarefa 21 — Dashboard: gráficos de faturamento diário, vendas por hora e por método ✅ concluída, revista pelo sénior
+
+Consome os endpoints da Tarefa 19 (`/api/admin/stats/daily`, `/hourly`,
+`/by-provider`), reaproveitando o `currentPeriod`/`periodToRange()` já
+existentes em `admin/index.html`. SVG inline à mão, sem biblioteca
+externa (mesma restrição de sempre: sem framework, sem build step).
+
+- **Gráfico de faturamento diário:** barras SVG, uma por dia do
+  intervalo, altura proporcional a `salesKz`. Mesmo com zero vendas em
+  todos os dias, as barras aparecem todas (achatadas em zero) — nunca
+  omitir um dia.
+- **Gráfico de vendas por hora:** 24 barras (0h-23h), mesma lógica.
+- **Vendas por método de pagamento:** lista de barras horizontais, uma
+  por `provider` devolvido. Se `providers: []` (sem vendas no período),
+  mostra um estado "sem vendas neste período" em vez de um gráfico vazio
+  a fingir que há dados.
+- Todos os três em `.admin-panel` (mesmo estilo do card "Próximos
+  passos" já existente), recarregam junto com o resto do dashboard
+  quando o período muda.
+
+**Critérios de aceitação (sénior valida):**
+- Testado ao vivo com dados reais: período com a venda real (299 000 Kz,
+  19/08) mostra o gráfico diário e o de hora certos; período sem vendas
+  mostra as barras todas achatadas em zero, nunca escondidas.
+- `node --check` limpo (não aplicável a `.html` inline, mas o JS embutido
+  foi lido linha a linha).
+
+**Nota da revisão (testado ao vivo, sessão local com backend real +
+BD de produção, sessão de admin injectada via JWT assinado com o
+`JWT_SECRET` real — sem alterar nem inventar dados):**
+- Período "Tudo" (23/07–22/08): 31 barras diárias (30 a zero + 1 real de
+  299 000 Kz no dia certo), 24 barras horárias (23 a zero + 1 real na
+  hora certa, 16h UTC), "Vendas por método" mostra "Manual · 299 000 Kz ·
+  100%" — nada omitido, nenhum dado inventado.
+- Período "Hoje" (sem vendas reais nesse intervalo): 2 barras diárias,
+  ambas a zero; 24 barras horárias, todas a zero; "Vendas por método"
+  mostra correctamente "Sem vendas neste período." em vez de um gráfico
+  vazio sem explicação.
+- Resolvido o "período Tudo" não ter `from`/`to` (as rotas de série
+  exigem sempre) usando a data de criação do curso mais antigo como
+  `from` — nunca poderia haver venda antes de o curso existir.
+
 ## Notas da revisão do sénior
 
 - **Auth:** corrigido um side-channel de tempo no login — quando o email

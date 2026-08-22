@@ -82,6 +82,33 @@
       </div>
     </div>
 
+    <div id="charts-section" class="hidden">
+      <div class="charts-grid">
+        <div class="admin-panel">
+          <div class="admin-panel-header">
+            <h2>Faturamento diário</h2>
+          </div>
+          <div id="daily-chart-empty" class="chart-empty-state hidden">Sem vendas neste período.</div>
+          <div id="daily-chart" class="chart-scroll"></div>
+        </div>
+        <div class="admin-panel">
+          <div class="admin-panel-header">
+            <h2>Vendas por hora</h2>
+          </div>
+          <div id="hourly-chart-empty" class="chart-empty-state hidden">Sem vendas neste período.</div>
+          <div id="hourly-chart" class="chart-scroll"></div>
+        </div>
+      </div>
+
+      <div class="admin-panel">
+        <div class="admin-panel-header">
+          <h2>Vendas por método de pagamento</h2>
+        </div>
+        <div id="provider-chart-empty" class="chart-empty-state hidden">Sem vendas neste período.</div>
+        <div id="provider-chart" class="provider-bars"></div>
+      </div>
+    </div>
+
     <div id="next-steps-card" class="admin-panel next-steps-card hidden">
       <div class="admin-panel-header">
         <h2>Próximos passos</h2>
@@ -117,6 +144,117 @@
     }
 
     return { from, to };
+  }
+
+  // Desenha um gráfico de barras SVG simples, sem biblioteca externa.
+  // `items` nunca pode ficar vazio para os gráficos diário/por-hora (o
+  // backend já preenche todos os dias/horas com zero) — mas se algum dia
+  // vier mesmo vazio, mostra o estado "sem dados" em vez de um SVG em branco.
+  function buildBarChart(containerId, emptyId, items, { getLabel, getValue, formatValue }) {
+    const container = document.getElementById(containerId);
+    const emptyEl = document.getElementById(emptyId);
+    container.innerHTML = '';
+
+    if (!items.length) {
+      emptyEl.classList.remove('hidden');
+      container.classList.add('hidden');
+      return;
+    }
+    emptyEl.classList.add('hidden');
+    container.classList.remove('hidden');
+
+    const values = items.map(getValue);
+    const max = Math.max(1, ...values); // nunca dividir por zero quando tudo está a zero
+    const barWidth = 18;
+    const gap = 6;
+    const chartHeight = 130;
+    const width = items.length * (barWidth + gap);
+    const height = chartHeight + 26;
+
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    svg.setAttribute('width', width);
+    svg.setAttribute('height', height);
+    svg.setAttribute('class', 'bar-chart-svg');
+
+    // Com muitas barras (ex: período "Tudo" com muitos dias), só rotula
+    // uma em cada N para não sobrepor texto — a barra em si continua lá,
+    // só o rótulo é que salta algumas.
+    const labelEvery = items.length > 15 ? Math.ceil(items.length / 12) : 1;
+
+    items.forEach((item, i) => {
+      const value = getValue(item);
+      const barHeight = Math.max(2, Math.round((value / max) * chartHeight));
+      const x = i * (barWidth + gap);
+      const y = chartHeight - barHeight;
+
+      const rect = document.createElementNS(svgNS, 'rect');
+      rect.setAttribute('x', x);
+      rect.setAttribute('y', y);
+      rect.setAttribute('width', barWidth);
+      rect.setAttribute('height', barHeight);
+      rect.setAttribute('rx', 3);
+      rect.setAttribute('class', value === 0 ? 'bar-chart-bar bar-chart-bar-zero' : 'bar-chart-bar');
+
+      const title = document.createElementNS(svgNS, 'title');
+      title.textContent = `${getLabel(item)}: ${formatValue(value)}`;
+      rect.appendChild(title);
+      svg.appendChild(rect);
+
+      if (i % labelEvery === 0) {
+        const text = document.createElementNS(svgNS, 'text');
+        text.setAttribute('x', x + barWidth / 2);
+        text.setAttribute('y', chartHeight + 16);
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('class', 'bar-chart-label');
+        text.textContent = getLabel(item);
+        svg.appendChild(text);
+      }
+    });
+
+    container.appendChild(svg);
+  }
+
+  function renderDailyChart(days) {
+    buildBarChart('daily-chart', 'daily-chart-empty', days, {
+      getLabel: (d) => d.date.slice(8, 10),
+      getValue: (d) => d.salesKz,
+      formatValue: (v) => formatKz(v),
+    });
+  }
+
+  function renderHourlyChart(hours) {
+    buildBarChart('hourly-chart', 'hourly-chart-empty', hours, {
+      getLabel: (h) => `${h.hour}h`,
+      getValue: (h) => h.salesKz,
+      formatValue: (v) => formatKz(v),
+    });
+  }
+
+  // Ao contrário dos gráficos diário/por-hora, aqui um array vazio É um
+  // estado real e esperado (nenhum método de pagamento teve vendas no
+  // período) — mostra a mensagem em vez de uma lista vazia sem explicação.
+  function renderProviderBars(providers) {
+    const container = document.getElementById('provider-chart');
+    const emptyEl = document.getElementById('provider-chart-empty');
+
+    if (!providers.length) {
+      emptyEl.classList.remove('hidden');
+      container.classList.add('hidden');
+      container.innerHTML = '';
+      return;
+    }
+    emptyEl.classList.add('hidden');
+    container.classList.remove('hidden');
+
+    container.innerHTML = providers.map((p) => `
+      <div class="provider-bar-row">
+        <span class="provider-bar-label">${p.provider}</span>
+        <div class="provider-bar-track"><div class="provider-bar-fill" style="width: ${p.pct}%"></div></div>
+        <span class="provider-bar-value">${formatKz(p.salesKz)} · ${p.pct}%</span>
+      </div>
+    `).join('');
   }
 
   function renderNextSteps(courses, stats) {
@@ -165,6 +303,7 @@
     async function loadDashboard() {
       loading.classList.remove('hidden');
       clearError(errorBox);
+      document.getElementById('charts-section').classList.add('hidden');
 
       try {
         const { from, to } = periodToRange(currentPeriod);
@@ -190,6 +329,34 @@
         document.getElementById('stat-avg-kz').textContent = formatKz(stats.avgTicketKz);
 
         renderNextSteps(coursesRes.courses || [], stats);
+
+        // As rotas de série (daily/hourly/by-provider) exigem sempre
+        // from/to — no período "Tudo" (sem from/to), usamos desde a
+        // criação do curso mais antigo até agora: nunca poderia haver
+        // venda antes de o curso existir, por isso cobre o histórico
+        // real inteiro sem ser um intervalo arbitrário.
+        let chartFrom = from;
+        let chartTo = to;
+        if (!chartFrom || !chartTo) {
+          const courses = coursesRes.courses || [];
+          const now = new Date();
+          chartTo = now.toISOString();
+          chartFrom = courses.length
+            ? new Date(Math.min(...courses.map((c) => new Date(c.createdAt).getTime()))).toISOString()
+            : now.toISOString();
+        }
+        const chartQuery = `?from=${encodeURIComponent(chartFrom)}&to=${encodeURIComponent(chartTo)}`;
+
+        const [dailyRes, hourlyRes, providerRes] = await Promise.all([
+          apiFetch(`/api/admin/stats/daily${chartQuery}`),
+          apiFetch(`/api/admin/stats/hourly${chartQuery}`),
+          apiFetch(`/api/admin/stats/by-provider${chartQuery}`),
+        ]);
+
+        renderDailyChart(dailyRes.days || []);
+        renderHourlyChart(hourlyRes.hours || []);
+        renderProviderBars(providerRes.providers || []);
+        document.getElementById('charts-section').classList.remove('hidden');
       } catch (err) {
         loading.classList.add('hidden');
         showError(errorBox, err);
